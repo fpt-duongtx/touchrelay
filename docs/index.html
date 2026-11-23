@@ -124,23 +124,33 @@ cd touchrelay
 INSTALL=1 ./scripts/make-app.sh
 open /Applications/TouchRelay.app</code></pre>
 
-      <h3><span class="en">Option B: download a prebuilt app (for the lazy)</span><span class="vi">Cách B: tải bản build sẵn (cho ai lười)</span></h3>
+      <h3><span class="en">Option B: download the app (DMG)</span><span class="vi">Cách B: tải app (DMG)</span></h3>
+      <ol>
+        <li><span class="en">Download <code>TouchRelay.dmg</code> (a universal Apple Silicon + Intel app) from <a href="https://github.com/fpt-duongtx/touchrelay/releases/latest">Releases</a>. Its <strong>MD5</strong> and SHA-256 checksums are published next to it.</span><span class="vi">Tải <code>TouchRelay.dmg</code> (app universal Apple Silicon + Intel) ở trang <a href="https://github.com/fpt-duongtx/touchrelay/releases/latest">Releases</a>. Mã <strong>MD5</strong> và SHA-256 được đăng ngay cạnh file.</span></li>
+        <li><span class="en">Optional: check it in Terminal: <code>md5 -q ~/Downloads/TouchRelay.dmg</code> and compare with the <code>.md5</code> file.</span><span class="vi">Tuỳ chọn: kiểm tra trong Terminal: <code>md5 -q ~/Downloads/TouchRelay.dmg</code> rồi so với file <code>.md5</code>.</span></li>
+        <li><span class="en">Open the DMG and drag <strong>TouchRelay</strong> onto <strong>Applications</strong>.</span><span class="vi">Mở file DMG và kéo <strong>TouchRelay</strong> vào <strong>Applications</strong>.</span></li>
+        <li><span class="en">Open TouchRelay. If macOS says it cannot verify the app, follow <a href="#gatekeeper">If macOS blocks the app</a> below.</span><span class="vi">Mở TouchRelay. Nếu macOS báo không xác minh được app, làm theo mục <a href="#gatekeeper">Nếu macOS chặn app</a> bên dưới.</span></li>
+      </ol>
+      <p><a class="btn primary" href="https://github.com/fpt-duongtx/touchrelay/releases/latest"><span class="en">Download TouchRelay.dmg</span><span class="vi">Tải TouchRelay.dmg</span></a></p>
+
+      <h3><span class="en">For the lazy: one paste in Terminal</span><span class="vi">Cho ai lười: dán một lần vào Terminal</span></h3>
       <p>
-        <span class="en">Download <code>TouchRelay.zip</code> (a universal Apple Silicon + Intel app) with its <strong>MD5</strong> and SHA-256 checksums from Releases. Copy these lines into Terminal: they download the latest version, check the MD5, install it and mark it as trusted (removes the quarantine flag), then open it.</span>
-        <span class="vi">Tải <code>TouchRelay.zip</code> (app universal Apple Silicon + Intel) cùng mã <strong>MD5</strong> và SHA-256 ở trang Releases. Dán các dòng sau vào Terminal: tải bản mới nhất, kiểm tra MD5, cài vào Applications và đánh dấu tin cậy (gỡ cờ quarantine), rồi mở app.</span>
+        <span class="en">Downloads the latest DMG, checks the MD5, copies the app to Applications, marks it as trusted (removes the quarantine flag, so there is no Gatekeeper prompt) and opens it.</span>
+        <span class="vi">Tải DMG mới nhất, kiểm tra MD5, chép app vào Applications, đánh dấu tin cậy (gỡ cờ quarantine nên không bị Gatekeeper hỏi) rồi mở app.</span>
       </p>
 <pre><code>cd ~/Downloads
-curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip
-curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip.md5
-[ "$(md5 -q TouchRelay.zip)" = "$(cut -d' ' -f1 TouchRelay.zip.md5)" ] &amp;&amp; echo "MD5 OK" || echo "MD5 MISMATCH - stop here"
-unzip -oq TouchRelay.zip -d /Applications
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.dmg
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.dmg.md5
+[ "$(md5 -q TouchRelay.dmg)" = "$(cut -d' ' -f1 TouchRelay.dmg.md5)" ] &amp;&amp; echo "MD5 OK" || echo "MD5 MISMATCH - stop here"
+hdiutil attach -nobrowse -quiet -mountpoint /tmp/touchrelay-dmg TouchRelay.dmg
+cp -R /tmp/touchrelay-dmg/TouchRelay.app /Applications/
+hdiutil detach -quiet /tmp/touchrelay-dmg
 xattr -dr com.apple.quarantine /Applications/TouchRelay.app
 open /Applications/TouchRelay.app</code></pre>
       <div class="note">
-        <span class="en"><strong>Not notarized.</strong> The maintainer does not have a paid Apple Developer ID, so the app is ad-hoc signed and macOS would warn if you opened a browser download directly. The commands above avoid that warning, but they also skip Apple's check, so <strong>only run them if you trust this repository</strong> and the MD5 says OK. A new version may ask you to grant the permissions again. If you prefer, use Option A and build it yourself.</span>
-        <span class="vi"><strong>Chưa notarize.</strong> Người duy trì không có Apple Developer ID trả phí, nên app chỉ ký ad-hoc và macOS sẽ cảnh báo nếu bạn mở trực tiếp bản tải từ trình duyệt. Các lệnh trên tránh cảnh báo đó nhưng cũng bỏ qua bước kiểm tra của Apple, nên <strong>chỉ chạy khi bạn tin repository này</strong> và MD5 báo OK. Phiên bản mới có thể yêu cầu cấp lại quyền. Nếu muốn chắc chắn, hãy dùng cách A để tự build.</span>
+        <span class="en"><strong>Not notarized.</strong> The maintainer does not have a paid Apple Developer ID, so the app is ad-hoc signed. The paste above skips Apple's own check, so <strong>only run it if you trust this repository</strong> and the MD5 says OK. A new version may ask you to grant the permissions again. If you prefer, use Option A and build it yourself.</span>
+        <span class="vi"><strong>Chưa notarize.</strong> Người duy trì không có Apple Developer ID trả phí nên app chỉ ký ad-hoc. Đoạn lệnh trên bỏ qua bước kiểm tra của Apple, nên <strong>chỉ chạy khi bạn tin repository này</strong> và MD5 báo OK. Phiên bản mới có thể yêu cầu cấp lại quyền. Nếu muốn chắc chắn, hãy dùng cách A để tự build.</span>
       </div>
-      <p><a class="btn primary" href="https://github.com/fpt-duongtx/touchrelay/releases"><span class="en">Go to Releases</span><span class="vi">Đến trang Releases</span></a></p>
 
       <h3><span class="en">First launch</span><span class="vi">Lần đầu mở</span></h3>
       <ol>
@@ -148,6 +158,30 @@ open /Applications/TouchRelay.app</code></pre>
         <li><span class="en">Reopen the app. The ☝︎ icon appears in the menu bar.</span><span class="vi">Mở lại app. Icon ☝︎ hiện trên thanh menu.</span></li>
         <li><span class="en">If touches are slightly off, open <strong>Tools → Touch area test</strong>, then <strong>Touch calibration</strong>.</span><span class="vi">Nếu chạm hơi lệch, mở <strong>Công cụ → Kiểm tra vùng chạm</strong>, rồi <strong>Hiệu chỉnh vị trí chạm</strong>.</span></li>
       </ol>
+    </div>
+  </section>
+
+  <section id="gatekeeper">
+    <div class="wrap">
+      <h2><span class="en">If macOS blocks the app</span><span class="vi">Nếu macOS chặn app</span></h2>
+      <p class="sub"><span class="en">Because TouchRelay is not notarized by Apple, Gatekeeper may say it cannot verify the app. You can still open it once you trust it. You only need to do this once per version.</span><span class="vi">Vì TouchRelay chưa được Apple notarize, Gatekeeper có thể báo không xác minh được app. Bạn vẫn mở được khi đã tin nguồn tải. Chỉ cần làm một lần cho mỗi phiên bản.</span></p>
+      <div class="grid">
+        <div class="card"><h3><span class="en">Step 1 · Try to open it</span><span class="vi">Bước 1 · Thử mở app</span></h3>
+          <p><span class="en">Open TouchRelay from Applications. macOS shows a message that it could not verify the app. Click <strong>Done</strong> (do <em>not</em> click Move to Trash).</span><span class="vi">Mở TouchRelay trong Applications. macOS hiện thông báo không xác minh được app. Bấm <strong>Done</strong> (<em>đừng</em> bấm Move to Trash).</span></p></div>
+        <div class="card"><h3><span class="en">Step 2 · Choose Open Anyway</span><span class="vi">Bước 2 · Chọn Open Anyway</span></h3>
+          <p><span class="en">Go to <strong> System Settings → Privacy &amp; Security</strong> and scroll to <strong>Security</strong>. Next to “TouchRelay was blocked to protect your Mac” click <strong>Open Anyway</strong>.</span><span class="vi">Vào <strong>System Settings → Privacy &amp; Security</strong>, cuộn xuống mục <strong>Security</strong>. Cạnh dòng “TouchRelay was blocked to protect your Mac” bấm <strong>Open Anyway</strong> (tên nút theo ngôn ngữ hệ thống).</span></p></div>
+        <div class="card"><h3><span class="en">Step 3 · Confirm</span><span class="vi">Bước 3 · Xác nhận</span></h3>
+          <p><span class="en">Enter your password or use Touch ID, then click <strong>Open Anyway</strong> once more. TouchRelay starts and will not ask again for this version.</span><span class="vi">Nhập mật khẩu hoặc dùng Touch ID, rồi bấm <strong>Open Anyway</strong> thêm lần nữa. TouchRelay sẽ mở và không hỏi lại với phiên bản này.</span></p></div>
+      </div>
+      <p class="sub" style="margin-top:20px">
+        <span class="en"><strong>macOS 14 or earlier:</strong> Control-click the app → <strong>Open</strong> → <strong>Open</strong>. <strong>Terminal alternative:</strong></span>
+        <span class="vi"><strong>macOS 14 trở xuống:</strong> Control-click vào app → <strong>Open</strong> → <strong>Open</strong>. <strong>Hoặc dùng Terminal:</strong></span>
+      </p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/TouchRelay.app</code></pre>
+      <div class="note">
+        <span class="en">Only do this for downloads you trust: verify the MD5 / SHA-256 first, or build from source (Option A) to avoid the prompt entirely. After opening, TouchRelay will also ask for the <strong>Input Monitoring</strong> and <strong>Accessibility</strong> permissions: turn both on, then reopen it.</span>
+        <span class="vi">Chỉ làm vậy với file bạn tin: hãy kiểm tra MD5 / SHA-256 trước, hoặc tự build từ mã nguồn (cách A) để không bị hỏi. Sau khi mở, TouchRelay còn xin hai quyền <strong>Input Monitoring</strong> và <strong>Accessibility</strong>: bật cả hai rồi mở lại app.</span>
+      </div>
     </div>
   </section>
 

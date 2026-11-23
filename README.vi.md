@@ -62,22 +62,38 @@ open /Applications/TouchRelay.app
 
 Script build bản release, tạo `dist/TouchRelay.app`, ký ngay trên máy bạn và (với `INSTALL=1`) chép vào `/Applications`. Tuỳ chọn: `UNIVERSAL=1` (Apple Silicon + Intel), `SIGN_IDENTITY="…"` (chứng chỉ của bạn), `BUNDLE_ID=…`.
 
-### Cách B: tải bản build sẵn (cho ai lười)
+### Cách B: tải app (DMG)
 
-Mỗi [Release](https://github.com/fpt-duongtx/touchrelay/releases) có `TouchRelay.zip` (app universal Apple Silicon + Intel) kèm mã **MD5** (`.md5`) và SHA-256 (`.sha256`). Bản này **ký ad-hoc và chưa được Apple notarize** (người duy trì không mua gói Developer ID). Dán đoạn sau vào Terminal: tải bản mới nhất, kiểm tra MD5, cài đặt, đánh dấu tin cậy (gỡ cờ quarantine để macOS không chặn) rồi mở app:
+1. Tải `TouchRelay.dmg` (app universal Apple Silicon + Intel) ở [bản phát hành mới nhất](https://github.com/fpt-duongtx/touchrelay/releases/latest). Mã **MD5** (`.md5`) và SHA-256 (`.sha256`) được đăng ngay cạnh. Kiểm tra tuỳ chọn: `md5 -q ~/Downloads/TouchRelay.dmg`.
+2. Mở file DMG và kéo **TouchRelay** vào **Applications**.
+3. Mở TouchRelay. Bản này **ký ad-hoc và chưa được Apple notarize** (người duy trì không mua gói Developer ID), nên macOS có thể chặn: xem [Nếu macOS chặn app](#nếu-macos-chặn-app).
+
+**Cho ai lười: dán một lần vào Terminal.** Tải DMG mới nhất, kiểm tra MD5, chép app vào Applications, đánh dấu tin cậy (gỡ cờ quarantine nên không bị Gatekeeper hỏi) rồi mở app:
 
 ```bash
 cd ~/Downloads
-curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip
-curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip.md5
-[ "$(md5 -q TouchRelay.zip)" = "$(cut -d' ' -f1 TouchRelay.zip.md5)" ] && echo "MD5 OK" || echo "MD5 MISMATCH - stop here"
-unzip -oq TouchRelay.zip -d /Applications
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.dmg
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.dmg.md5
+[ "$(md5 -q TouchRelay.dmg)" = "$(cut -d' ' -f1 TouchRelay.dmg.md5)" ] && echo "MD5 OK" || echo "MD5 MISMATCH - stop here"
+hdiutil attach -nobrowse -quiet -mountpoint /tmp/touchrelay-dmg TouchRelay.dmg
+cp -R /tmp/touchrelay-dmg/TouchRelay.app /Applications/
+hdiutil detach -quiet /tmp/touchrelay-dmg
 xattr -dr com.apple.quarantine /Applications/TouchRelay.app
 open /Applications/TouchRelay.app
 ```
 
-> Cách này bỏ qua bước kiểm tra của Apple, nên **chỉ chạy khi bạn tin repository này** và MD5 báo OK. Không muốn vậy? Tải zip bằng trình duyệt: Control-click vào app → **Open**, hoặc **System Settings → Privacy & Security → Open Anyway**. Hoặc dùng Cách A để tự build.
+> Cách này bỏ qua bước kiểm tra của Apple, nên **chỉ chạy khi bạn tin repository này** và MD5 báo OK.
 > Chữ ký ad-hoc đổi theo từng bản build nên macOS coi mỗi phiên bản là app mới, và bạn có thể phải cấp lại hai quyền sau khi cập nhật.
+
+### Nếu macOS chặn app
+
+Vì TouchRelay chưa được notarize, Gatekeeper có thể báo không xác minh được app. Bạn vẫn mở được khi đã tin nguồn tải (một lần cho mỗi phiên bản):
+
+1. Mở TouchRelay trong Applications. Khi macOS báo không xác minh được app, bấm **Done** (đừng bấm *Move to Trash*).
+2. Vào **System Settings → Privacy & Security**, cuộn tới mục **Security**, cạnh dòng "TouchRelay was blocked to protect your Mac" bấm **Open Anyway**.
+3. Nhập mật khẩu hoặc dùng Touch ID, rồi bấm **Open Anyway** thêm lần nữa.
+
+macOS 14 trở xuống: Control-click vào app → **Open** → **Open**. Hoặc dùng Terminal: `xattr -dr com.apple.quarantine /Applications/TouchRelay.app`.
 
 ### Quyền (lần đầu mở)
 

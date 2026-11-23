@@ -21,18 +21,13 @@ jobs:
         run: cargo test --all-targets
       - name: Build universal app (ad-hoc signed)
         run: UNIVERSAL=1 ./scripts/make-app.sh
-      - name: Checksum
-        run: |
-          cd dist
-          shasum -a 256 TouchRelay.zip > TouchRelay.zip.sha256
-          # MD5 cho người dùng chỉ cần kiểm tra nhanh (định dạng "<hash>  <tên file>")
-          echo "$(md5 -q TouchRelay.zip)  TouchRelay.zip" > TouchRelay.zip.md5
-          cat TouchRelay.zip.sha256 TouchRelay.zip.md5
+      - name: Show checksums (written by make-app.sh)
+        run: cat dist/TouchRelay.dmg.md5 dist/TouchRelay.dmg.sha256
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/TouchRelay.zip dist/TouchRelay.zip.sha256 dist/TouchRelay.zip.md5 \
+          gh release create "$GITHUB_REF_NAME" dist/TouchRelay.dmg dist/TouchRelay.dmg.md5 dist/TouchRelay.dmg.sha256 \
             --title "TouchRelay $GITHUB_REF_NAME" \
             --generate-notes \
-            --notes "Ad-hoc signed, **not notarized**. macOS will warn on first launch: see the README (Install → Option B) and the disclaimer. Verify the MD5 / SHA-256 checksum."
+            --notes "Download **TouchRelay.dmg**, open it and drag TouchRelay to Applications. Ad-hoc signed, **not notarized**: if macOS blocks it, see *If macOS blocks the app* in the README. Verify the MD5 / SHA-256 checksum."

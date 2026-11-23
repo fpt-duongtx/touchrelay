@@ -143,11 +143,15 @@ article .meta { color: var(--fg-soft); font-size: 14px; margin-bottom: 24px; }
 .shots-hint { margin: 2px 0 0; font-size: 13px; color: var(--fg-soft); }
 
 dialog#lightbox {
-  border: 0; padding: 0; background: transparent; max-width: min(96vw, 1100px); max-height: 94vh; overflow: visible;
+  /* Chiều rộng cố định (không để dialog tự co theo ảnh): max-width:100% của ảnh cần cha có bề rộng xác định,
+     nếu không một số trình duyệt (Safari) vẽ ảnh rất nhỏ hoặc rỗng. */
+  border: 0; padding: 0; background: transparent; width: min(96vw, 1100px); max-width: 96vw; max-height: 94vh; overflow: visible;
 }
 dialog#lightbox::backdrop { background: rgba(0,0,0,.72); backdrop-filter: blur(4px); }
 dialog#lightbox figure { margin: 0; text-align: center; }
-dialog#lightbox img { max-width: 100%; max-height: 82vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+dialog#lightbox img { display: block; margin: 0 auto; width: auto; height: auto; max-width: 100%; max-height: 82vh; object-fit: contain; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+dialog#lightbox .lb-fail { color: #fff; padding: 24px; text-align: center; }
+dialog#lightbox .lb-fail a { color: #9cf; }
 dialog#lightbox figcaption { color: #fff; margin-top: 10px; font-size: 15px; }
 #lightbox-close {
   position: absolute; top: -14px; right: -14px; width: 34px; height: 34px; border-radius: 50%;

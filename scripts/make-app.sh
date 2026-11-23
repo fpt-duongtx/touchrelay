@@ -63,6 +63,34 @@ codesign --verify --strict "$APP"
 
 ( cd "$DIST" && rm -f "$APP_NAME.zip" && ditto -c -k --keepParent "$APP_NAME.app" "$APP_NAME.zip" )
 
+# --- DMG: mở ra, kéo app vào Applications. Kèm mã MD5 + SHA-256 để người dùng kiểm tra.
+echo "▶︎ Tạo $APP_NAME.dmg"
+STAGE="$DIST/dmg-stage"
+rm -rf "$STAGE" "$DIST/$APP_NAME.dmg"
+mkdir -p "$STAGE"
+ditto "$APP" "$STAGE/$APP_NAME.app"
+ln -s /Applications "$STAGE/Applications"
+cat > "$STAGE/First launch - Lần đầu mở.txt" <<EOT
+$APP_NAME is ad-hoc signed and NOT notarized by Apple.
+1. Drag $APP_NAME.app to Applications.
+2. If macOS blocks it: Control-click the app > Open, or System Settings > Privacy & Security > Open Anyway,
+   or run in Terminal:  xattr -dr com.apple.quarantine /Applications/$APP_NAME.app
+3. Turn on Input Monitoring and Accessibility for $APP_NAME when asked, then reopen it.
+Only do this if you trust the source (https://github.com/fpt-duongtx/touchrelay) and the checksum matches.
+
+$APP_NAME được ký ad-hoc và CHƯA được Apple notarize.
+1. Kéo $APP_NAME.app vào Applications.
+2. Nếu macOS chặn: Control-click vào app > Open, hoặc System Settings > Privacy & Security > Open Anyway,
+   hoặc chạy trong Terminal:  xattr -dr com.apple.quarantine /Applications/$APP_NAME.app
+3. Bật Input Monitoring và Accessibility cho $APP_NAME khi được hỏi, rồi mở lại app.
+Chỉ làm vậy nếu bạn tin nguồn tải (https://github.com/fpt-duongtx/touchrelay) và mã kiểm tra khớp.
+EOT
+hdiutil create -quiet -volname "$APP_NAME" -srcfolder "$STAGE" -fs HFS+ -format UDZO -imagekey zlib-level=9 -ov "$DIST/$APP_NAME.dmg"
+rm -rf "$STAGE"
+( cd "$DIST" \
+  && echo "$(md5 -q "$APP_NAME.dmg")  $APP_NAME.dmg" > "$APP_NAME.dmg.md5" \
+  && shasum -a 256 "$APP_NAME.dmg" > "$APP_NAME.dmg.sha256" )
+
 if [[ "${INSTALL:-0}" == "1" ]]; then
   echo "▶︎ Cài vào /Applications"
   osascript -e "tell application \"$APP_NAME\" to quit" >/dev/null 2>&1 || true
@@ -73,7 +101,8 @@ if [[ "${INSTALL:-0}" == "1" ]]; then
 fi
 
 echo
-echo "✅ Xong: $APP   (bản zip: $DIST/$APP_NAME.zip)"
+echo "✅ Xong: $APP   (zip: $DIST/$APP_NAME.zip, dmg: $DIST/$APP_NAME.dmg)"
+echo "   MD5: $(cut -d' ' -f1 "$DIST/$APP_NAME.dmg.md5")"
 echo "   Mở thử: open \"$APP\""
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
   echo

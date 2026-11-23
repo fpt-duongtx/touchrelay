@@ -62,22 +62,38 @@ open /Applications/TouchRelay.app
 
 The script builds a release binary, creates `dist/TouchRelay.app`, signs it on your machine and (with `INSTALL=1`) copies it to `/Applications`. Options: `UNIVERSAL=1` for an Apple Silicon + Intel build, `SIGN_IDENTITY="…"` to use your own certificate, `BUNDLE_ID=…`.
 
-### Option B: download a prebuilt app (for the lazy)
+### Option B: download the app (DMG)
 
-Each [Release](https://github.com/fpt-duongtx/touchrelay/releases) has `TouchRelay.zip` (a universal Apple Silicon + Intel app) with **MD5** (`.md5`) and SHA-256 (`.sha256`) checksums. Builds are **ad-hoc signed and not notarized by Apple** (the maintainer has no paid Developer ID). Paste this into Terminal: it downloads the latest version, checks the MD5, installs it, marks it as trusted (removes the quarantine flag, so macOS does not block it) and opens it:
+1. Download `TouchRelay.dmg` (a universal Apple Silicon + Intel app) from the [latest release](https://github.com/fpt-duongtx/touchrelay/releases/latest). Its **MD5** (`.md5`) and SHA-256 (`.sha256`) checksums are published next to it. Optional check: `md5 -q ~/Downloads/TouchRelay.dmg`.
+2. Open the DMG and drag **TouchRelay** onto **Applications**.
+3. Open TouchRelay. Builds are **ad-hoc signed and not notarized by Apple** (the maintainer has no paid Developer ID), so macOS may block it: see [If macOS blocks the app](#if-macos-blocks-the-app).
+
+**For the lazy: one paste in Terminal.** It downloads the latest DMG, checks the MD5, copies the app to Applications, marks it as trusted (removes the quarantine flag, so there is no Gatekeeper prompt) and opens it:
 
 ```bash
 cd ~/Downloads
-curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip
-curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip.md5
-[ "$(md5 -q TouchRelay.zip)" = "$(cut -d' ' -f1 TouchRelay.zip.md5)" ] && echo "MD5 OK" || echo "MD5 MISMATCH - stop here"
-unzip -oq TouchRelay.zip -d /Applications
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.dmg
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.dmg.md5
+[ "$(md5 -q TouchRelay.dmg)" = "$(cut -d' ' -f1 TouchRelay.dmg.md5)" ] && echo "MD5 OK" || echo "MD5 MISMATCH - stop here"
+hdiutil attach -nobrowse -quiet -mountpoint /tmp/touchrelay-dmg TouchRelay.dmg
+cp -R /tmp/touchrelay-dmg/TouchRelay.app /Applications/
+hdiutil detach -quiet /tmp/touchrelay-dmg
 xattr -dr com.apple.quarantine /Applications/TouchRelay.app
 open /Applications/TouchRelay.app
 ```
 
-> This skips Apple's own check, so **only run it if you trust this repository** and the MD5 says OK. Prefer not to? Download the zip in your browser instead: Control-click the app → **Open**, or **System Settings → Privacy & Security → Open Anyway**. Or use Option A and build it yourself.
+> This skips Apple's own check, so **only run it if you trust this repository** and the MD5 says OK.
 > Ad-hoc signatures change with every build, so macOS treats each new version as a new app and you may have to grant the two permissions again after updating.
+
+### If macOS blocks the app
+
+Because TouchRelay is not notarized, Gatekeeper may say it cannot verify the app. You can still open it once you trust it (once per version):
+
+1. Open TouchRelay from Applications. When macOS says it could not verify the app, click **Done** (not *Move to Trash*).
+2. Open **System Settings → Privacy & Security**, scroll to **Security**, and next to "TouchRelay was blocked to protect your Mac" click **Open Anyway**.
+3. Enter your password or use Touch ID, then click **Open Anyway** once more.
+
+On macOS 14 or earlier: Control-click the app → **Open** → **Open**. Terminal alternative: `xattr -dr com.apple.quarantine /Applications/TouchRelay.app`.
 
 ### Permissions (first launch)
 
