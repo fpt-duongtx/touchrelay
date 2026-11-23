@@ -1,0 +1,14 @@
+# Build
+target/
+dist/
+
+# Logs & local state
+dev.log
+*.log
+settings.backup.txt
+
+# macOS
+.DS_Store
+
+# Claude Code local settings (the shared skill in .claude/skills is kept)
+.claude/settings.local.json

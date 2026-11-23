@@ -1,0 +1,36 @@
+name: Release
+
+# Tạo bản build ad-hoc (chưa notarize) khi đẩy tag dạng v*, ví dụ: git tag v0.1.0 && git push --tags
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain (Apple Silicon + Intel)
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          rustup show
+      - name: Test
+        run: cargo test --all-targets
+      - name: Build universal app (ad-hoc signed)
+        run: UNIVERSAL=1 ./scripts/make-app.sh
+      - name: Checksum
+        run: |
+          cd dist
+          shasum -a 256 TouchRelay.zip > TouchRelay.zip.sha256
+          cat TouchRelay.zip.sha256
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/TouchRelay.zip dist/TouchRelay.zip.sha256 \
+            --title "TouchRelay $GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "Ad-hoc signed, **not notarized**. macOS will warn on first launch: see the README (Install → Option B) and the disclaimer. Verify the SHA-256 checksum."

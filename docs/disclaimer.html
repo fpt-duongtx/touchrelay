@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Disclaimer · TouchRelay for Mac</title>
+  <meta name="description" content="Disclaimer and terms of use for TouchRelay for Mac.">
+  <link rel="stylesheet" href="style.css">
+  <script src="site.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./">TouchRelay</a>
+    <nav>
+      <a href="./"><span class="en">Home</span><span class="vi">Trang chủ</span></a>
+      <a href="https://github.com/fpt-duongtx/touchrelay">GitHub</a>
+      <span class="lang" role="group" aria-label="Language">
+        <button data-lang="en" aria-pressed="true">EN</button><button data-lang="vi" aria-pressed="false">VI</button>
+      </span>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+<article>
+  <h1><span class="en">Disclaimer</span><span class="vi">Miễn trừ trách nhiệm</span></h1>
+  <p class="meta"><span class="en">Last updated: 2026-11-23. This page is information for users, not legal advice.</span><span class="vi">Cập nhật lần cuối: 23/11/2026. Trang này là thông tin cho người dùng, không phải tư vấn pháp lý.</span></p>
+
+  <div class="en">
+    <h2>1. No warranty</h2>
+    <p>TouchRelay for Mac ("the software") is released under the <a href="https://github.com/fpt-duongtx/touchrelay/blob/main/LICENSE">MIT License</a> and is provided <strong>"as is"</strong>, without warranty of any kind, express or implied, including fitness for a particular purpose, merchantability, non-infringement, or that it will work with your hardware or with any macOS version. You use it at your own risk. To the fullest extent permitted by law, the authors and contributors are not liable for any claim, damage or loss arising from the use of, or inability to use, the software.</p>
+
+    <h2>2. Not affiliated</h2>
+    <p>TouchRelay is an independent, unofficial project. It is <strong>not affiliated with, endorsed by or sponsored by Apple Inc., ILITEK, or any touchscreen, monitor or computer manufacturer</strong>. Apple, Mac, macOS, MacBook, Mission Control, Safari and other names are trademarks of their respective owners. Product names are used only to describe compatibility.</p>
+
+    <h2>3. What the software does on your Mac</h2>
+    <ul>
+      <li><strong>Input Monitoring</strong>: reads the raw reports of the touchscreen (a HID device). It does not read keystrokes or any other device on purpose.</li>
+      <li><strong>Accessibility</strong>: posts mouse, scroll, gesture and keyboard events (for example <code>Ctrl + arrow</code> for three-finger swipes) and, if "Smart tap" is on, asks other apps' accessibility interface for the control nearest to a tap.</li>
+      <li>It takes <strong>exclusive control</strong> of the touchscreen (and its fake mouse interface) while running, so the device stops behaving as a normal mouse. Quitting the app releases it.</li>
+      <li>It may <strong>hide the mouse pointer</strong> while you touch the screen.</li>
+      <li>The optional "Interface size" feature <strong>temporarily changes the display mode</strong> (resolution) of your touchscreen. It is restored when the app quits, but if the app is killed or crashes the mode may stay until you change it in System Settings → Displays. Changing display modes can briefly blank the screen or, on unsupported hardware, render it blurry.</li>
+      <li>It stores its settings and a log under <code>~/Library/Application Support/touchrelay/</code> and <code>~/Library/Logs/</code>. The log may contain the name, vendor/product IDs and HID descriptor of your touchscreen. Check it before you share it.</li>
+    </ul>
+
+    <h2>4. Privacy</h2>
+    <p>The software has <strong>no network code</strong>: it does not collect, transmit or sell any data, and has no analytics or auto-update. If you contact the maintainer or open an issue, the information you send is handled by the channel you use (for example GitHub).</p>
+
+    <h2>5. Private and unsupported interfaces</h2>
+    <p>Pinch-to-zoom and some pointer behaviour rely on <strong>undocumented macOS interfaces</strong>. Apple may change or remove them in any update, which can break features or cause unexpected behaviour. The software is not designed for, and must not be relied on in, safety-critical, medical, industrial or other situations where a malfunction could cause harm.</p>
+
+    <h2>6. Unsigned builds</h2>
+    <p>Prebuilt downloads are <strong>ad-hoc signed and not notarized by Apple</strong>. macOS will warn when you open them. Only run a prebuilt app if you trust this repository, verify the published SHA-256 checksum, or build it yourself from the source. Do not install copies from other sources.</p>
+
+    <h2>7. Your data and settings</h2>
+    <p>Tools such as "Touch calibration", "Touch area test" and "Reset calibration" change or delete only TouchRelay's own settings. You are responsible for your own backups.</p>
+
+    <h2>8. Third-party content</h2>
+    <p>Links to external sites are provided for convenience; the maintainer is not responsible for their content.</p>
+
+    <h2>9. Changes</h2>
+    <p>This disclaimer may be updated at any time. Continued use of the software means you accept the current version.</p>
+
+    <p>Questions or reports: <a href="https://github.com/fpt-duongtx/touchrelay/issues">GitHub Issues</a>.</p>
+  </div>
+
+  <div class="vi">
+    <h2>1. Không bảo hành</h2>
+    <p>TouchRelay for Mac ("phần mềm") được phát hành theo <a href="https://github.com/fpt-duongtx/touchrelay/blob/main/LICENSE">giấy phép MIT</a> và được cung cấp <strong>"nguyên trạng"</strong>, không có bất kỳ bảo đảm nào, rõ ràng hay ngầm định, gồm cả việc phù hợp cho một mục đích cụ thể, khả năng thương mại, không vi phạm quyền, hoặc việc phần mềm sẽ chạy với phần cứng hay phiên bản macOS của bạn. Bạn tự chịu rủi ro khi sử dụng. Trong phạm vi pháp luật cho phép, tác giả và người đóng góp không chịu trách nhiệm về bất kỳ khiếu nại, thiệt hại hay mất mát nào phát sinh từ việc dùng hoặc không dùng được phần mềm.</p>
+
+    <h2>2. Không liên kết</h2>
+    <p>TouchRelay là dự án độc lập, không chính thức. <strong>Không liên kết, không được bảo trợ hay xác nhận bởi Apple Inc., ILITEK hay bất kỳ nhà sản xuất màn hình cảm ứng, màn hình hoặc máy tính nào.</strong> Apple, Mac, macOS, MacBook, Mission Control, Safari và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Tên sản phẩm chỉ dùng để mô tả khả năng tương thích.</p>
+
+    <h2>3. Phần mềm làm gì trên máy của bạn</h2>
+    <ul>
+      <li><strong>Input Monitoring</strong>: đọc báo cáo thô của màn hình cảm ứng (một thiết bị HID). Phần mềm không chủ ý đọc phím gõ hay thiết bị nào khác.</li>
+      <li><strong>Accessibility</strong>: phát sự kiện chuột, cuộn, cử chỉ và bàn phím (ví dụ <code>Ctrl + mũi tên</code> cho vuốt 3 ngón), và nếu bật "Chạm thông minh" thì hỏi giao diện trợ năng của app khác để tìm điều khiển gần điểm chạm nhất.</li>
+      <li>Khi chạy, nó <strong>chiếm quyền điều khiển độc quyền</strong> màn hình cảm ứng (và giao diện chuột giả lập của nó), nên thiết bị không còn hoạt động như chuột thông thường. Thoát app là nhả ra.</li>
+      <li>Nó có thể <strong>ẩn con trỏ chuột</strong> khi bạn chạm vào màn hình.</li>
+      <li>Tính năng tuỳ chọn "Cỡ giao diện" <strong>tạm đổi chế độ hiển thị</strong> (độ phân giải) của màn hình cảm ứng. Chế độ này được khôi phục khi thoát app, nhưng nếu app bị tắt đột ngột hoặc lỗi, chế độ có thể giữ nguyên cho đến khi bạn đổi lại ở System Settings → Displays. Đổi chế độ hiển thị có thể làm màn hình tối tạm thời, hoặc bị mờ trên phần cứng không hỗ trợ.</li>
+      <li>Phần mềm lưu cài đặt và log trong <code>~/Library/Application Support/touchrelay/</code> và <code>~/Library/Logs/</code>. Log có thể chứa tên, mã nhà sản xuất/sản phẩm và HID descriptor của màn hình cảm ứng; hãy kiểm tra trước khi chia sẻ.</li>
+    </ul>
+
+    <h2>4. Quyền riêng tư</h2>
+    <p>Phần mềm <strong>không có mã kết nối mạng</strong>: không thu thập, gửi hay bán dữ liệu, không có phân tích hay tự cập nhật. Khi bạn liên hệ hoặc mở issue, thông tin bạn gửi do kênh bạn dùng xử lý (ví dụ GitHub).</p>
+
+    <h2>5. Giao diện riêng, không được hỗ trợ</h2>
+    <p>Pinch-zoom và một số hành vi con trỏ dựa trên <strong>giao diện macOS không có tài liệu</strong>. Apple có thể đổi hoặc gỡ chúng trong bất kỳ bản cập nhật nào, làm tính năng hỏng hoặc hoạt động bất ngờ. Phần mềm không được thiết kế cho, và không nên dựa vào trong, các tình huống đòi hỏi an toàn, y tế, công nghiệp hay nơi sự cố có thể gây hại.</p>
+
+    <h2>6. Bản build chưa ký</h2>
+    <p>Các bản tải sẵn được <strong>ký ad-hoc và chưa được Apple notarize</strong>; macOS sẽ cảnh báo khi mở. Chỉ chạy bản tải sẵn nếu bạn tin repository này, đã kiểm tra mã SHA-256 được công bố, hoặc tự build từ mã nguồn. Không cài các bản sao từ nguồn khác.</p>
+
+    <h2>7. Dữ liệu và cài đặt của bạn</h2>
+    <p>Các công cụ như "Hiệu chỉnh vị trí chạm", "Kiểm tra vùng chạm" và "Đặt lại hiệu chỉnh" chỉ thay đổi hoặc xoá cài đặt của chính TouchRelay. Bạn tự chịu trách nhiệm sao lưu dữ liệu của mình.</p>
+
+    <h2>8. Nội dung bên thứ ba</h2>
+    <p>Liên kết đến trang ngoài chỉ để thuận tiện; người duy trì không chịu trách nhiệm về nội dung của các trang đó.</p>
+
+    <h2>9. Thay đổi</h2>
+    <p>Miễn trừ này có thể được cập nhật bất kỳ lúc nào. Tiếp tục sử dụng phần mềm nghĩa là bạn chấp nhận phiên bản hiện hành.</p>
+
+    <p>Câu hỏi hoặc báo lỗi: <a href="https://github.com/fpt-duongtx/touchrelay/issues">GitHub Issues</a>.</p>
+  </div>
+</article>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 fpt-duongtx · MIT</span>
+    <a href="./"><span class="en">Home</span><span class="vi">Trang chủ</span></a>
+    <a href="https://github.com/fpt-duongtx/touchrelay/issues"><span class="en">Contact / Issues</span><span class="vi">Liên hệ / Issues</span></a>
+  </div>
+</footer>
+</body>
+</html>

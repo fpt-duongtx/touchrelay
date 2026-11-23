@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TouchRelay for Mac</title>
+  <meta name="description" content="Make an external USB touchscreen work natively on macOS: tap, drag, momentum scrolling, pinch and multi-finger swipes. Open source, pure Rust, no dependencies.">
+  <meta property="og:title" content="TouchRelay for Mac">
+  <meta property="og:description" content="Make an external USB touchscreen work natively on macOS.">
+  <link rel="stylesheet" href="style.css">
+  <script src="site.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./">TouchRelay</a>
+    <nav>
+      <a class="hide-sm" href="#features"><span class="en">Features</span><span class="vi">Tính năng</span></a>
+      <a class="hide-sm" href="#install"><span class="en">Install</span><span class="vi">Cài đặt</span></a>
+      <a href="https://github.com/fpt-duongtx/touchrelay">GitHub</a>
+      <span class="lang" role="group" aria-label="Language">
+        <button data-lang="en" aria-pressed="true">EN</button><button data-lang="vi" aria-pressed="false">VI</button>
+      </span>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <span class="badge"><span class="en">Open source · MIT · Unofficial</span><span class="vi">Mã nguồn mở · MIT · Không chính thức</span></span>
+    <h1>TouchRelay for Mac</h1>
+    <p class="lead">
+      <span class="en">Make an external USB touchscreen work natively on macOS: tap, drag, smooth scrolling with momentum, pinch-to-zoom and multi-finger swipes.</span>
+      <span class="vi">Giúp màn hình cảm ứng USB rời hoạt động như native trên macOS: chạm, kéo, cuộn mượt có quán tính, pinch-zoom và vuốt nhiều ngón.</span>
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/fpt-duongtx/touchrelay/releases"><span class="en">Download</span><span class="vi">Tải về</span></a>
+      <a class="btn" href="https://github.com/fpt-duongtx/touchrelay"><span class="en">View on GitHub</span><span class="vi">Xem trên GitHub</span></a>
+    </div>
+  </div>
+
+  <section id="why">
+    <div class="wrap">
+      <h2><span class="en">Why it exists</span><span class="vi">Vì sao cần</span></h2>
+      <p class="sub">
+        <span class="en">macOS has no support for third-party touchscreens: plug one in and it acts like a one-point mouse. No scrolling, no pinch, and two fingers make a mess. TouchRelay reads the screen's raw HID reports, recognises gestures and sends the events macOS apps already understand.</span>
+        <span class="vi">macOS không hỗ trợ màn hình cảm ứng của bên thứ ba: cắm vào chỉ như một con chuột 1 điểm, không cuộn, không pinch, chạm 2 ngón thì loạn. TouchRelay đọc báo cáo HID thô của màn hình, nhận diện cử chỉ và gửi các sự kiện mà app macOS đã hiểu.</span>
+      </p>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <h2><span class="en">Features</span><span class="vi">Tính năng</span></h2>
+      <p class="sub"><span class="en">A small menu bar app. Pure Rust, no dependencies, and it never connects to the network.</span><span class="vi">Một app nhỏ trên thanh menu. Rust thuần, không dependency, không bao giờ kết nối mạng.</span></p>
+      <div class="grid">
+        <div class="card"><h3><span class="en">Native gestures</span><span class="vi">Cử chỉ như native</span></h3>
+          <p><span class="en">Tap, double tap, right click, drag, momentum scrolling, pinch, three-finger swipes.</span><span class="vi">Chạm, chạm đôi, click phải, kéo, cuộn quán tính, pinch, vuốt 3 ngón.</span></p></div>
+        <div class="card"><h3><span class="en">Smart tap</span><span class="vi">Chạm thông minh</span></h3>
+          <p><span class="en">A tap that just misses a small button snaps to the nearest control.</span><span class="vi">Chạm trượt một nút nhỏ sẽ tự hút vào điều khiển gần nhất.</span></p></div>
+        <div class="card"><h3><span class="en">Calibration &amp; touch map</span><span class="vi">Hiệu chỉnh &amp; bản đồ chạm</span></h3>
+          <p><span class="en">Fix sensors that are not linear near the edges, and see in yellow where your screen detects touch.</span><span class="vi">Sửa cảm biến không tuyến tính ở mép, và xem màu vàng nơi màn hình nhận chạm.</span></p></div>
+        <div class="card"><h3><span class="en">Hot-plug</span><span class="vi">Cắm/rút nóng</span></h3>
+          <p><span class="en">Unplug and replug the screen at any time; no restart.</span><span class="vi">Cắm hoặc rút màn hình lúc nào cũng được, không cần mở lại app.</span></p></div>
+        <div class="card"><h3><span class="en">Native settings</span><span class="vi">Cài đặt native</span></h3>
+          <p><span class="en">System-Settings-style window, English and Vietnamese that follow the system language.</span><span class="vi">Cửa sổ kiểu System Settings, tiếng Anh và tiếng Việt theo ngôn ngữ hệ thống.</span></p></div>
+        <div class="card"><h3><span class="en">Open source</span><span class="vi">Mã nguồn mở</span></h3>
+          <p><span class="en">MIT licensed. Reports from other touchscreens are very welcome.</span><span class="vi">Giấy phép MIT. Rất mong báo cáo từ các màn hình cảm ứng khác.</span></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="gestures">
+    <div class="wrap">
+      <h2><span class="en">Gestures</span><span class="vi">Cử chỉ</span></h2>
+      <table>
+        <thead><tr><th><span class="en">On the touchscreen</span><span class="vi">Trên màn hình cảm ứng</span></th><th><span class="en">Result on macOS</span><span class="vi">Kết quả trên macOS</span></th></tr></thead>
+        <tbody>
+          <tr><td><span class="en">Tap with 1 finger</span><span class="vi">Chạm 1 ngón</span></td><td><span class="en">Left click (two quick taps = double click)</span><span class="vi">Click trái (chạm nhanh 2 lần = double-click)</span></td></tr>
+          <tr><td><span class="en">Drag with 1 finger</span><span class="vi">Kéo 1 ngón</span></td><td><span class="en">Scroll, iPad style</span><span class="vi">Cuộn kiểu iPad</span></td></tr>
+          <tr><td><span class="en">Hold ~0.3 s, then drag</span><span class="vi">Giữ yên ~0.3s rồi kéo</span></td><td><span class="en">Mouse drag: sliders, selection, windows</span><span class="vi">Kéo chuột: thanh trượt, chọn chữ, cửa sổ</span></td></tr>
+          <tr><td><span class="en">Drag with 2 fingers</span><span class="vi">Kéo 2 ngón</span></td><td><span class="en">Smooth scroll with momentum</span><span class="vi">Cuộn mượt có quán tính</span></td></tr>
+          <tr><td><span class="en">Tap with 2 fingers</span><span class="vi">Chạm 2 ngón</span></td><td><span class="en">Right click</span><span class="vi">Click phải</span></td></tr>
+          <tr><td><span class="en">Pinch / spread</span><span class="vi">Chụm / xoè</span></td><td><span class="en">Zoom</span><span class="vi">Zoom</span></td></tr>
+          <tr><td><span class="en">Swipe 3 fingers left / right</span><span class="vi">Vuốt 3 ngón trái / phải</span></td><td><span class="en">Switch Space</span><span class="vi">Chuyển Space</span></td></tr>
+          <tr><td><span class="en">Swipe 3 fingers up / down</span><span class="vi">Vuốt 3 ngón lên / xuống</span></td><td><span class="en">Mission Control / App Exposé</span><span class="vi">Mission Control / App Exposé</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="hardware">
+    <div class="wrap">
+      <h2><span class="en">Tested hardware</span><span class="vi">Phần cứng đã thử</span></h2>
+      <table>
+        <thead><tr><th><span class="en">Touchscreen</span><span class="vi">Màn hình cảm ứng</span></th><th><span class="en">Result</span><span class="vi">Kết quả</span></th></tr></thead>
+        <tbody><tr><td>ILITEK-TP (<code>0x222a:0x0001</code>), 10 points, 2560×1600</td><td><span class="en">Works</span><span class="vi">Hoạt động</span></td></tr></tbody>
+      </table>
+      <p class="sub" style="margin-top:12px">
+        <span class="en">Any screen that exposes a standard HID Digitizer / Touch Screen should work. Please <a href="https://github.com/fpt-duongtx/touchrelay/issues">open an issue</a> with your device's report descriptor if yours does not.</span>
+        <span class="vi">Mọi màn hình dùng chuẩn HID Digitizer / Touch Screen đều nên chạy. Nếu màn hình của bạn không chạy, hãy <a href="https://github.com/fpt-duongtx/touchrelay/issues">mở issue</a> kèm report descriptor của thiết bị.</span>
+      </p>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <h2><span class="en">Install</span><span class="vi">Cài đặt</span></h2>
+      <p class="sub"><span class="en">macOS 13 or later, Apple Silicon or Intel.</span><span class="vi">macOS 13 trở lên, Apple Silicon hoặc Intel.</span></p>
+
+      <h3><span class="en">Option A: build from source (recommended)</span><span class="vi">Cách A: tự build từ mã nguồn (khuyên dùng)</span></h3>
+<pre><code># Rust (rustup.rs) + Xcode Command Line Tools
+git clone https://github.com/fpt-duongtx/touchrelay.git
+cd touchrelay
+INSTALL=1 ./scripts/make-app.sh
+open /Applications/TouchRelay.app</code></pre>
+
+      <h3><span class="en">Option B: download a prebuilt app</span><span class="vi">Cách B: tải bản build sẵn</span></h3>
+      <div class="note">
+        <span class="en"><strong>Not notarized.</strong> The maintainer does not have a paid Apple Developer ID, so prebuilt downloads are ad-hoc signed and macOS will warn the first time. Verify the published SHA-256 checksum, then Control-click → Open, or use <strong>Privacy &amp; Security → Open Anyway</strong>. A new version may ask you to grant the permissions again. If you are not comfortable with that, use Option A.</span>
+        <span class="vi"><strong>Chưa notarize.</strong> Người duy trì không có Apple Developer ID trả phí, nên bản tải sẵn chỉ ký ad-hoc và macOS sẽ cảnh báo lần đầu. Hãy kiểm tra mã SHA-256 được công bố, rồi Control-click → Open hoặc dùng <strong>Privacy &amp; Security → Open Anyway</strong>. Phiên bản mới có thể yêu cầu cấp lại quyền. Nếu bạn không muốn vậy, hãy dùng cách A.</span>
+      </div>
+      <p><a class="btn primary" href="https://github.com/fpt-duongtx/touchrelay/releases"><span class="en">Go to Releases</span><span class="vi">Đến trang Releases</span></a></p>
+
+      <h3><span class="en">First launch</span><span class="vi">Lần đầu mở</span></h3>
+      <ol>
+        <li><span class="en">Turn on <strong>Input Monitoring</strong> and <strong>Accessibility</strong> for TouchRelay (the app opens the right page).</span><span class="vi">Bật <strong>Input Monitoring</strong> và <strong>Accessibility</strong> cho TouchRelay (app tự mở đúng trang).</span></li>
+        <li><span class="en">Reopen the app. The ☝︎ icon appears in the menu bar.</span><span class="vi">Mở lại app. Icon ☝︎ hiện trên thanh menu.</span></li>
+        <li><span class="en">If touches are slightly off, open <strong>Tools → Touch area test</strong>, then <strong>Touch calibration</strong>.</span><span class="vi">Nếu chạm hơi lệch, mở <strong>Công cụ → Kiểm tra vùng chạm</strong>, rồi <strong>Hiệu chỉnh vị trí chạm</strong>.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <h2>FAQ</h2>
+      <div class="grid">
+        <div class="card"><h3><span class="en">Is it on the Mac App Store?</span><span class="vi">Có trên Mac App Store không?</span></h3>
+          <p><span class="en">No. The sandbox blocks posting events, the Accessibility API and exclusive HID access, which this app needs.</span><span class="vi">Không. Sandbox chặn phát sự kiện, Accessibility API và chiếm độc quyền HID, những thứ app cần.</span></p></div>
+        <div class="card"><h3><span class="en">Does it collect data?</span><span class="vi">Có thu thập dữ liệu không?</span></h3>
+          <p><span class="en">No. It has no network code, analytics or auto-update.</span><span class="vi">Không. App không có mã mạng, phân tích hay tự cập nhật.</span></p></div>
+        <div class="card"><h3><span class="en">Why can't I tap the very edge?</span><span class="vi">Vì sao không chạm được sát mép?</span></h3>
+          <p><span class="en">Some sensors do not cover the whole panel. The Touch area test shows where; TouchRelay can stretch the reachable area to the edge.</span><span class="vi">Một số cảm biến không phủ hết tấm nền. Kiểm tra vùng chạm cho thấy chỗ nào; TouchRelay có thể kéo vùng chạm được ra tới mép.</span></p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 fpt-duongtx · MIT</span>
+    <a href="disclaimer.html"><span class="en">Disclaimer</span><span class="vi">Miễn trừ trách nhiệm</span></a>
+    <a href="https://github.com/fpt-duongtx/touchrelay/blob/main/LICENSE">License</a>
+    <a href="https://github.com/fpt-duongtx/touchrelay/issues"><span class="en">Contact / Issues</span><span class="vi">Liên hệ / Issues</span></a>
+    <span><span class="en">Not affiliated with Apple or any hardware vendor.</span><span class="vi">Không liên kết với Apple hay hãng phần cứng nào.</span></span>
+  </div>
+</footer>
+</body>
+</html>

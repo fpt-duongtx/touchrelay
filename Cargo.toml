@@ -1,0 +1,16 @@
+[package]
+name = "touchrelay"
+version = "0.1.0"
+edition = "2021"
+description = "Makes an external USB/HID touchscreen work natively on macOS: tap, drag, scroll with momentum, pinch and multi-finger swipes."
+repository = "https://github.com/fpt-duongtx/touchrelay"
+readme = "README.md"
+license = "MIT"
+
+# Không dùng crate ngoài: toàn bộ IOKit / CoreFoundation / CoreGraphics gọi qua FFI thuần.
+[dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
