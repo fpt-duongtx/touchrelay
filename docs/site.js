@@ -21,3 +21,23 @@
   });
   apply(lang);
 })();
+
+// Screenshot lightbox
+(function () {
+  var dlg = document.getElementById("lightbox");
+  if (!dlg || !dlg.showModal) return;
+  var img = document.getElementById("lightbox-img");
+  var cap = document.getElementById("lightbox-cap");
+  document.addEventListener("click", function (ev) {
+    var shot = ev.target.closest && ev.target.closest(".shot");
+    if (shot) {
+      var lang = document.documentElement.getAttribute("lang") === "vi" ? "vi" : "en";
+      img.src = shot.getAttribute("data-full");
+      img.alt = cap.textContent = shot.getAttribute("data-" + lang) || "";
+      dlg.showModal();
+      return;
+    }
+    // Click on the backdrop or the close button closes the dialog.
+    if (ev.target === dlg || (ev.target.id === "lightbox-close")) dlg.close();
+  });
+})();

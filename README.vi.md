@@ -62,17 +62,21 @@ open /Applications/TouchRelay.app
 
 Script build bản release, tạo `dist/TouchRelay.app`, ký ngay trên máy bạn và (với `INSTALL=1`) chép vào `/Applications`. Tuỳ chọn: `UNIVERSAL=1` (Apple Silicon + Intel), `SIGN_IDENTITY="…"` (chứng chỉ của bạn), `BUNDLE_ID=…`.
 
-### Cách B: tải bản build sẵn
+### Cách B: tải bản build sẵn (cho ai lười)
 
-Tải `TouchRelay.zip` ở trang [Releases](https://github.com/fpt-duongtx/touchrelay/releases). Bản này **ký ad-hoc và chưa được Apple notarize** (người duy trì không mua gói Developer ID), nên macOS sẽ cảnh báo lần đầu:
+Mỗi [Release](https://github.com/fpt-duongtx/touchrelay/releases) có `TouchRelay.zip` (app universal Apple Silicon + Intel) kèm mã **MD5** (`.md5`) và SHA-256 (`.sha256`). Bản này **ký ad-hoc và chưa được Apple notarize** (người duy trì không mua gói Developer ID). Dán đoạn sau vào Terminal: tải bản mới nhất, kiểm tra MD5, cài đặt, đánh dấu tin cậy (gỡ cờ quarantine để macOS không chặn) rồi mở app:
 
-1. Giải nén và chuyển `TouchRelay.app` vào `/Applications`.
-2. Control-click vào app → **Open** → **Open**. Nếu vẫn bị chặn, vào **System Settings → Privacy & Security** bấm **Open Anyway**, hoặc chạy:
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/TouchRelay.app
-   ```
-3. Kiểm tra bản tải bằng file `.sha256` đăng kèm.
+```bash
+cd ~/Downloads
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip.md5
+[ "$(md5 -q TouchRelay.zip)" = "$(cut -d' ' -f1 TouchRelay.zip.md5)" ] && echo "MD5 OK" || echo "MD5 MISMATCH - stop here"
+unzip -oq TouchRelay.zip -d /Applications
+xattr -dr com.apple.quarantine /Applications/TouchRelay.app
+open /Applications/TouchRelay.app
+```
 
+> Cách này bỏ qua bước kiểm tra của Apple, nên **chỉ chạy khi bạn tin repository này** và MD5 báo OK. Không muốn vậy? Tải zip bằng trình duyệt: Control-click vào app → **Open**, hoặc **System Settings → Privacy & Security → Open Anyway**. Hoặc dùng Cách A để tự build.
 > Chữ ký ad-hoc đổi theo từng bản build nên macOS coi mỗi phiên bản là app mới, và bạn có thể phải cấp lại hai quyền sau khi cập nhật.
 
 ### Quyền (lần đầu mở)

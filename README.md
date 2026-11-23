@@ -62,17 +62,21 @@ open /Applications/TouchRelay.app
 
 The script builds a release binary, creates `dist/TouchRelay.app`, signs it on your machine and (with `INSTALL=1`) copies it to `/Applications`. Options: `UNIVERSAL=1` for an Apple Silicon + Intel build, `SIGN_IDENTITY="…"` to use your own certificate, `BUNDLE_ID=…`.
 
-### Option B: download a prebuilt app
+### Option B: download a prebuilt app (for the lazy)
 
-Download `TouchRelay.zip` from the [Releases](https://github.com/fpt-duongtx/touchrelay/releases) page. Builds are **ad-hoc signed and not notarized by Apple** (the maintainer has no paid Developer ID), so macOS will warn the first time:
+Each [Release](https://github.com/fpt-duongtx/touchrelay/releases) has `TouchRelay.zip` (a universal Apple Silicon + Intel app) with **MD5** (`.md5`) and SHA-256 (`.sha256`) checksums. Builds are **ad-hoc signed and not notarized by Apple** (the maintainer has no paid Developer ID). Paste this into Terminal: it downloads the latest version, checks the MD5, installs it, marks it as trusted (removes the quarantine flag, so macOS does not block it) and opens it:
 
-1. Unzip and move `TouchRelay.app` to `/Applications`.
-2. Control-click the app → **Open** → **Open**. If macOS still refuses, open **System Settings → Privacy & Security** and click **Open Anyway**, or run:
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/TouchRelay.app
-   ```
-3. Verify the download with the `.sha256` file published next to the zip.
+```bash
+cd ~/Downloads
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip.md5
+[ "$(md5 -q TouchRelay.zip)" = "$(cut -d' ' -f1 TouchRelay.zip.md5)" ] && echo "MD5 OK" || echo "MD5 MISMATCH - stop here"
+unzip -oq TouchRelay.zip -d /Applications
+xattr -dr com.apple.quarantine /Applications/TouchRelay.app
+open /Applications/TouchRelay.app
+```
 
+> This skips Apple's own check, so **only run it if you trust this repository** and the MD5 says OK. Prefer not to? Download the zip in your browser instead: Control-click the app → **Open**, or **System Settings → Privacy & Security → Open Anyway**. Or use Option A and build it yourself.
 > Ad-hoc signatures change with every build, so macOS treats each new version as a new app and you may have to grant the two permissions again after updating.
 
 ### Permissions (first launch)

@@ -37,6 +37,15 @@
       <a class="btn primary" href="https://github.com/fpt-duongtx/touchrelay/releases"><span class="en">Download</span><span class="vi">Tải về</span></a>
       <a class="btn" href="https://github.com/fpt-duongtx/touchrelay"><span class="en">View on GitHub</span><span class="vi">Xem trên GitHub</span></a>
     </div>
+    <div class="shots" role="list" aria-label="Screenshots">
+      <button class="shot" role="listitem" data-full="img/menu.jpg" data-en="Menu bar menu" data-vi="Menu trên thanh menu"><img src="img/menu-sm.jpg" width="380" height="368" loading="lazy" alt="TouchRelay menu bar menu"></button>
+      <button class="shot" role="listitem" data-full="img/general.png" data-en="Settings: General" data-vi="Cài đặt: Chung"><img src="img/general-sm.png" width="520" height="391" loading="lazy" alt="Settings window, General page"></button>
+      <button class="shot" role="listitem" data-full="img/scrolling.png" data-en="Settings: Scrolling" data-vi="Cài đặt: Cuộn"><img src="img/scrolling-sm.png" width="520" height="391" loading="lazy" alt="Settings window, Scrolling page"></button>
+      <button class="shot" role="listitem" data-full="img/gestures.png" data-en="Settings: Gestures" data-vi="Cài đặt: Cử chỉ"><img src="img/gestures-sm.png" width="520" height="391" loading="lazy" alt="Settings window, Gestures page"></button>
+      <button class="shot" role="listitem" data-full="img/display.png" data-en="Settings: Display" data-vi="Cài đặt: Màn hình"><img src="img/display-sm.png" width="520" height="391" loading="lazy" alt="Settings window, Display page"></button>
+      <button class="shot" role="listitem" data-full="img/tools.png" data-en="Settings: Tools" data-vi="Cài đặt: Công cụ"><img src="img/tools-sm.png" width="520" height="391" loading="lazy" alt="Settings window, Tools page"></button>
+    </div>
+    <p class="shots-hint"><span class="en">Click a screenshot to enlarge.</span><span class="vi">Bấm vào ảnh để phóng to.</span></p>
   </div>
 
   <section id="why">
@@ -115,10 +124,21 @@ cd touchrelay
 INSTALL=1 ./scripts/make-app.sh
 open /Applications/TouchRelay.app</code></pre>
 
-      <h3><span class="en">Option B: download a prebuilt app</span><span class="vi">Cách B: tải bản build sẵn</span></h3>
+      <h3><span class="en">Option B: download a prebuilt app (for the lazy)</span><span class="vi">Cách B: tải bản build sẵn (cho ai lười)</span></h3>
+      <p>
+        <span class="en">Download <code>TouchRelay.zip</code> (a universal Apple Silicon + Intel app) with its <strong>MD5</strong> and SHA-256 checksums from Releases. Copy these lines into Terminal: they download the latest version, check the MD5, install it and mark it as trusted (removes the quarantine flag), then open it.</span>
+        <span class="vi">Tải <code>TouchRelay.zip</code> (app universal Apple Silicon + Intel) cùng mã <strong>MD5</strong> và SHA-256 ở trang Releases. Dán các dòng sau vào Terminal: tải bản mới nhất, kiểm tra MD5, cài vào Applications và đánh dấu tin cậy (gỡ cờ quarantine), rồi mở app.</span>
+      </p>
+<pre><code>cd ~/Downloads
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip
+curl -fLO https://github.com/fpt-duongtx/touchrelay/releases/latest/download/TouchRelay.zip.md5
+[ "$(md5 -q TouchRelay.zip)" = "$(cut -d' ' -f1 TouchRelay.zip.md5)" ] &amp;&amp; echo "MD5 OK" || echo "MD5 MISMATCH - stop here"
+unzip -oq TouchRelay.zip -d /Applications
+xattr -dr com.apple.quarantine /Applications/TouchRelay.app
+open /Applications/TouchRelay.app</code></pre>
       <div class="note">
-        <span class="en"><strong>Not notarized.</strong> The maintainer does not have a paid Apple Developer ID, so prebuilt downloads are ad-hoc signed and macOS will warn the first time. Verify the published SHA-256 checksum, then Control-click → Open, or use <strong>Privacy &amp; Security → Open Anyway</strong>. A new version may ask you to grant the permissions again. If you are not comfortable with that, use Option A.</span>
-        <span class="vi"><strong>Chưa notarize.</strong> Người duy trì không có Apple Developer ID trả phí, nên bản tải sẵn chỉ ký ad-hoc và macOS sẽ cảnh báo lần đầu. Hãy kiểm tra mã SHA-256 được công bố, rồi Control-click → Open hoặc dùng <strong>Privacy &amp; Security → Open Anyway</strong>. Phiên bản mới có thể yêu cầu cấp lại quyền. Nếu bạn không muốn vậy, hãy dùng cách A.</span>
+        <span class="en"><strong>Not notarized.</strong> The maintainer does not have a paid Apple Developer ID, so the app is ad-hoc signed and macOS would warn if you opened a browser download directly. The commands above avoid that warning, but they also skip Apple's check, so <strong>only run them if you trust this repository</strong> and the MD5 says OK. A new version may ask you to grant the permissions again. If you prefer, use Option A and build it yourself.</span>
+        <span class="vi"><strong>Chưa notarize.</strong> Người duy trì không có Apple Developer ID trả phí, nên app chỉ ký ad-hoc và macOS sẽ cảnh báo nếu bạn mở trực tiếp bản tải từ trình duyệt. Các lệnh trên tránh cảnh báo đó nhưng cũng bỏ qua bước kiểm tra của Apple, nên <strong>chỉ chạy khi bạn tin repository này</strong> và MD5 báo OK. Phiên bản mới có thể yêu cầu cấp lại quyền. Nếu muốn chắc chắn, hãy dùng cách A để tự build.</span>
       </div>
       <p><a class="btn primary" href="https://github.com/fpt-duongtx/touchrelay/releases"><span class="en">Go to Releases</span><span class="vi">Đến trang Releases</span></a></p>
 
@@ -155,5 +175,12 @@ open /Applications/TouchRelay.app</code></pre>
     <span><span class="en">Not affiliated with Apple or any hardware vendor.</span><span class="vi">Không liên kết với Apple hay hãng phần cứng nào.</span></span>
   </div>
 </footer>
+<dialog id="lightbox" aria-label="Screenshot">
+  <figure>
+    <img id="lightbox-img" alt="">
+    <figcaption id="lightbox-cap"></figcaption>
+  </figure>
+  <button id="lightbox-close" aria-label="Close">×</button>
+</dialog>
 </body>
 </html>

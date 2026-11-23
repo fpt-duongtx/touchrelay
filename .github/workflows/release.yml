@@ -25,12 +25,14 @@ jobs:
         run: |
           cd dist
           shasum -a 256 TouchRelay.zip > TouchRelay.zip.sha256
-          cat TouchRelay.zip.sha256
+          # MD5 cho người dùng chỉ cần kiểm tra nhanh (định dạng "<hash>  <tên file>")
+          echo "$(md5 -q TouchRelay.zip)  TouchRelay.zip" > TouchRelay.zip.md5
+          cat TouchRelay.zip.sha256 TouchRelay.zip.md5
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/TouchRelay.zip dist/TouchRelay.zip.sha256 \
+          gh release create "$GITHUB_REF_NAME" dist/TouchRelay.zip dist/TouchRelay.zip.sha256 dist/TouchRelay.zip.md5 \
             --title "TouchRelay $GITHUB_REF_NAME" \
             --generate-notes \
-            --notes "Ad-hoc signed, **not notarized**. macOS will warn on first launch: see the README (Install → Option B) and the disclaimer. Verify the SHA-256 checksum."
+            --notes "Ad-hoc signed, **not notarized**. macOS will warn on first launch: see the README (Install → Option B) and the disclaimer. Verify the MD5 / SHA-256 checksum."
