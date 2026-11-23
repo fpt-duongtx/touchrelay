@@ -1,6 +1,6 @@
 [package]
 name = "touchrelay"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Makes an external USB/HID touchscreen work natively on macOS: tap, drag, scroll with momentum, pinch and multi-finger swipes."
 repository = "https://github.com/fpt-duongtx/touchrelay"

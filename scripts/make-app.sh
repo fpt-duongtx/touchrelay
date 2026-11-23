@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="TouchRelay"
-BUNDLE_ID="${BUNDLE_ID:-local.touchrelay}"
+BUNDLE_ID="${BUNDLE_ID:-io.github.fpt-duongtx.touchrelay}"
 LOCAL_ID="Touchmac Local Signing" # chứng chỉ tự cấp, giữ quyền TCC qua các lần build
 if [[ -z "${SIGN_IDENTITY:-}" ]]; then
   if security find-identity -p codesigning 2>/dev/null | grep -q "\"$LOCAL_ID\""; then

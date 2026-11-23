@@ -10,7 +10,7 @@ Chạm, cuộn 1 ngón, hot-plug (rút/cắm cáp) đều hoạt động với I
 
 ### Máy của người dùng
 - MacBook Pro Apple Silicon (arm64), zsh, Rust qua rustup (`. "$HOME/.cargo/env"` nếu thiếu `cargo`).
-- Project: `~/Projects/touchmac`. App cài ở `/Applications/TouchRelay.app`, bundle id `local.touchrelay`.
+- Project: `~/Projects/touchmac`. App cài ở `/Applications/TouchRelay.app`, bundle id `io.github.fpt-duongtx.touchrelay`.
 - Màn hình MacBook id=1 1800x1169 tại (0,0); màn hình rời id=3 2560x1600. **Vị trí màn hình rời đổi theo lần sắp xếp** (từng là (1800,0), hiện (-2560,-244)); app luôn đọc từ CoreGraphics lúc chạy và theo dõi thay đổi mỗi giây.
 - Thiết bị: **ILITEK-TP vid=0x222a pid=0x0001**, 10 slot/report, report ID 4, kèm 1 interface chuột giả lập cùng VID/PID.
 
@@ -20,7 +20,7 @@ Chạm, cuộn 1 ngón, hot-plug (rút/cắm cáp) đều hoạt động với I
 3. **Sink giãn cách sự kiện chuột** (MoveTo → 15ms → MouseDown → 40ms → MouseUp) bằng hàng đợi `queue`/`pump` chạy theo timer 120Hz. Click phát liền trong một vòng lặp bị menu ngữ cảnh bỏ qua (lỗi: sau click phải bằng 2 ngón, chạm 1 ngón không đóng được menu). Nếu lỗi vẫn còn, kiểm tra thứ tự/thời gian ở đây trước.
 4. **Hot-plug** dùng `IOHIDManagerRegisterDeviceMatchingCallback`/`RemovalCallback` + `ScheduleWithRunLoop`, **không cần `IOHIDManagerOpen`**; mở thiết bị bằng `IOHIDDeviceOpen(seize)` ngay trong callback. Interface chuột giả lập được chặn bằng manager thứ hai (`on_mouse_added`) và cũng khi cảm ứng vừa mở.
 5. **Màn hình đích có thể chưa bật lúc cảm ứng xuất hiện** (sau khi cắm lại) → timer tính lại `target_bounds` mỗi ~1 giây.
-6. **Chữ ký:** ký ad-hoc làm macOS coi mỗi bản build là app mới và mất quyền TCC. `scripts/make-app.sh` tự dùng chứng chỉ cục bộ **"Touchmac Local Signing"** (trong keychain đăng nhập) nếu có, giữ quyền qua các lần build. Nếu thiếu chứng chỉ, quay về ad-hoc và cần `tccutil reset ListenEvent local.touchrelay; tccutil reset Accessibility local.touchrelay` (luôn kèm bundle id, không reset toàn cục) rồi cấp lại quyền.
+6. **Chữ ký:** ký ad-hoc làm macOS coi mỗi bản build là app mới và mất quyền TCC. `scripts/make-app.sh` tự dùng chứng chỉ cục bộ **"Touchmac Local Signing"** (trong keychain đăng nhập) nếu có, giữ quyền qua các lần build. Nếu thiếu chứng chỉ, quay về ad-hoc và cần `tccutil reset ListenEvent io.github.fpt-duongtx.touchrelay; tccutil reset Accessibility io.github.fpt-duongtx.touchrelay` (luôn kèm bundle id, không reset toàn cục) rồi cấp lại quyền.
 7. **Kéo 1 ngón = cuộn** (mặc định). Giữ yên ≥0.3s (`drag_hold_time`) → engine nhấn giữ nút chuột trái ngay (MouseDown), sau đó kéo = kéo chuột (thanh trượt, chọn chữ), nhả không kéo = click. Click phải = chạm 2 ngón (long-press click phải chỉ còn khi tắt kéo-1-ngón-cuộn), vì long-press trước đây làm mở context menu khi người dùng giữ để kéo.
 8. Claude Code chạy lệnh trong shell riêng nên **không có quyền Input Monitoring/Accessibility**. Muốn chạy `./scripts/dev.sh` cần mở trong Terminal panel của app (`run_in_terminal`) và người dùng phải chạm màn hình trong lúc chạy. Lệnh trong `run_in_terminal` chỉ được chứa ASCII.
 
