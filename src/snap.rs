@@ -282,7 +282,8 @@ mod mac {
             }
             let mut roles: Vec<String> = vec![];
             let mut cur = el;
-            for _ in 0..12 {
+            // Trang web (Chrome) lồng rất sâu: cần đi đủ xa để gặp AXWebArea.
+            for _ in 0..64 {
                 if let Some(r) = role_of(cur) {
                     roles.push(r);
                 }
@@ -294,11 +295,17 @@ mod mac {
                 }
                 cur = parent;
             }
-            if !cur.is_null() {
+            let truncated = !cur.is_null();
+            if truncated {
                 CFRelease(cur);
             }
             let refs: Vec<&str> = roles.iter().map(|s| s.as_str()).collect();
-            classify_drag_intent(&refs)
+            let intent = classify_drag_intent(&refs);
+            // Chuỗi bị cắt giữa chừng mà chưa thấy vai trò kéo/cuộn nào: chưa biết → cuộn (mặc định), không kéo nhầm.
+            if truncated && intent == Some(true) && !refs.iter().any(|r| DRAG_ROLES.contains(r)) {
+                return None;
+            }
+            intent
         }
     }
 
