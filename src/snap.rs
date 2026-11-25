@@ -46,6 +46,18 @@ pub fn is_text_role(role: &str) -> bool {
 pub struct Focus {
     pub is_text: bool,
     pub frame: Option<(P, P)>,
+    /// Con trỏ đang ở đầu câu (ô trống, sau xuống dòng, hoặc sau ". " "? " "! "); None nếu không đọc được.
+    pub at_sentence_start: Option<bool>,
+}
+
+/// Văn bản trước con trỏ có kết thúc một câu không (để tự viết hoa chữ kế tiếp).
+pub fn is_sentence_start(before: &str) -> bool {
+    let t = before.trim_end_matches([' ', '\t']);
+    if t.is_empty() || t.ends_with('\n') {
+        return true;
+    }
+    // Phải có ít nhất một khoảng trắng sau dấu kết câu ("Hi." + chữ thì chưa phải câu mới).
+    t.len() < before.len() && t.ends_with(['.', '?', '!'])
 }
 
 /// Vai trò mà kéo 1 ngón nên là KÉO CHUỘT (thanh trượt, thanh cuộn, đường chia, ô nhập 1 dòng...).
@@ -196,6 +208,31 @@ mod mac {
         ok.then(|| std::ffi::CStr::from_ptr(buf.as_ptr()).to_string_lossy().into_owned())
     }
 
+    /// Văn bản đứng trước con trỏ (AXValue cắt theo AXSelectedTextRange, đơn vị UTF-16).
+    unsafe fn text_before_caret(el: AxRef) -> Option<String> {
+        let (v, r) = (attr(el, "AXValue"), attr(el, "AXSelectedTextRange"));
+        let mut out = None;
+        if !v.is_null() && !r.is_null() && CFGetTypeID(v) == CFStringGetTypeID() {
+            let mut range = [0i64; 2]; // CFRange {location, length}
+            if AXValueGetValue(r, 4, range.as_mut_ptr() as *mut c_void) {
+                let mut buf = vec![0 as std::ffi::c_char; 8192];
+                if CFStringGetCString(v, buf.as_mut_ptr(), buf.len() as CFIndex, kCFStringEncodingUTF8) != 0 {
+                    let full = std::ffi::CStr::from_ptr(buf.as_ptr()).to_string_lossy().into_owned();
+                    let u: Vec<u16> = full.encode_utf16().collect();
+                    let loc = (range[0].max(0) as usize).min(u.len());
+                    out = Some(String::from_utf16_lossy(&u[..loc]));
+                }
+            }
+        }
+        if !v.is_null() {
+            CFRelease(v);
+        }
+        if !r.is_null() {
+            CFRelease(r);
+        }
+        out
+    }
+
     unsafe fn frame_of(el: AxRef) -> Option<(P, P)> {
         let (pv, sv) = (attr(el, "AXPosition"), attr(el, "AXSize"));
         let mut pos = CGPoint { x: 0.0, y: 0.0 };
@@ -308,8 +345,9 @@ mod mac {
             }
             let is_text = role_of(el).as_deref().is_some_and(is_text_role);
             let frame = if is_text { frame_of(el) } else { None };
+            let at_sentence_start = if is_text { text_before_caret(el).map(|t| is_sentence_start(&t)) } else { None };
             CFRelease(el);
-            Some(Focus { is_text, frame })
+            Some(Focus { is_text, frame, at_sentence_start })
         }
     }
 
@@ -350,6 +388,17 @@ mod mac {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detects_sentence_start() {
+        assert!(is_sentence_start(""));
+        assert!(is_sentence_start("Hello.\n"));
+        assert!(is_sentence_start("Hello. "));
+        assert!(is_sentence_start("Really? "));
+        assert!(!is_sentence_start("Hello."));
+        assert!(!is_sentence_start("Hello"));
+        assert!(!is_sentence_start("Hello, "));
+    }
 
     #[test]
     fn drag_intent_classification() {

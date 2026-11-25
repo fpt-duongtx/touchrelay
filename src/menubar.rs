@@ -1714,6 +1714,24 @@ const MOD_CAPS: u8 = 16;
 static KBD_WIN: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static KBD_BTNS: [AtomicPtr<c_void>; 72] = [const { AtomicPtr::new(ptr::null_mut()) }; 72];
 static KBD_MODS: AtomicU8 = AtomicU8::new(0);
+/// Tự viết hoa: chữ cái kế tiếp sẽ được gõ hoa (đầu ô nhập, đầu câu).
+static KBD_LAST_END: AtomicBool = AtomicBool::new(false);
+static KBD_CAP: AtomicBool = AtomicBool::new(false);
+
+/// Đặt trạng thái tự viết hoa theo vị trí con trỏ (từ Accessibility) và cập nhật nhãn phím.
+pub fn kbd_set_autocap(on: bool) {
+    KBD_CAP.store(on, Ordering::SeqCst);
+    unsafe {
+        if !KBD_WIN.load(Ordering::SeqCst).is_null() {
+            kbd_refresh();
+        }
+    }
+}
+
+/// Phím chữ cái (a-z) không?
+fn is_letter_key(d: &KeyDef) -> bool {
+    d.label.len() == 1 && d.label.as_bytes()[0].is_ascii_lowercase()
+}
 /// Vị trí bàn phím lần trước (toạ độ Quartz: x, y của mép trên); nhớ giữa các lần hiện.
 static KBD_POS_SET: AtomicBool = AtomicBool::new(false);
 static KBD_POS_X: AtomicU64 = AtomicU64::new(0);
@@ -1780,7 +1798,8 @@ unsafe fn kbd_refresh() {
         } else if d.kind == Lang {
             msg_id(b, "setTitle:", ns(&format!("🌐 {}", crate::input_source::current_abbrev())));
         } else {
-            msg_id(b, "setTitle:", ns(key_label(d, mods)));
+            let m = if is_letter_key(d) && KBD_CAP.load(Ordering::SeqCst) { mods ^ MOD_SHIFT } else { mods };
+            msg_id(b, "setTitle:", ns(key_label(d, m)));
         }
     }
 }
@@ -1868,13 +1887,19 @@ unsafe fn kbd_build() -> Id {
     msg_int(ve, "setMaterial:", 13); // HUD window
     msg_int(ve, "setBlendingMode:", 0);
     msg_int(ve, "setState:", 1);
-    msg_bool(ve, "setWantsLayer:", true);
-    let layer = msg(ve, "layer");
-    if !layer.is_null() {
-        msg_f64(layer, "setCornerRadius:", 14.0);
-        msg_bool(layer, "setMasksToBounds:", true);
+    // Ảnh mặt nạ bo góc: nền kính (và nhờ đó cả bóng đổ của cửa sổ) theo đúng hình bo góc, không bị khung vuông.
+    {
+        let img = msg_size(msg(class("NSImage"), "alloc"), "initWithSize:", Size { w: KBD_W, h: KBD_H });
+        msg(img, "lockFocus");
+        msg_id(color("blackColor"), "set", NIL);
+        let f: extern "C" fn(Id, Sel, Rect, f64, f64) -> Id = transmute(imp());
+        let path = f(class("NSBezierPath"), sel("bezierPathWithRoundedRect:xRadius:yRadius:"), Rect { x: 0.0, y: 0.0, w: KBD_W, h: KBD_H }, 14.0, 14.0);
+        msg(path, "fill");
+        msg(img, "unlockFocus");
+        msg_id(ve, "setMaskImage:", img);
     }
     msg_id(win, "setContentView:", ve);
+    msg(win, "invalidateShadow");
 
     let target = TARGET.load(Ordering::SeqCst);
     // Thanh kéo: chấm tròn ở giữa + nút đóng bên phải.
@@ -1950,6 +1975,10 @@ pub fn kbd_show(bounds: (f64, f64, f64, f64), main_h: f64, avoid: Option<(f64, f
         KBD_MODS.store(0, Ordering::SeqCst);
         kbd_refresh();
         msg(win, "orderFrontRegardless");
+        msg(win, "invalidateShadow"); // bóng đổ theo hình bo góc của nội dung, không theo khung vuông
+        // Lần vẽ đầu chưa xong ngay: tính lại bóng thêm lần nữa sau khi nội dung đã lên màn hình.
+        let g: extern "C" fn(Id, Sel, Sel, Id, f64) = transmute(imp());
+        g(win, sel("performSelector:withObject:afterDelay:"), sel("invalidateShadow"), NIL, 0.15);
     }
 }
 
@@ -1993,10 +2022,23 @@ extern "C" fn on_kbd_key(_this: Id, _cmd: Sel, sender: Id) {
             return;
         }
         let mut flags = mods_to_flags(mods);
+        let cap = KBD_CAP.load(Ordering::SeqCst);
+        if cap && is_letter_key(d) && mods & (MOD_CTRL | MOD_OPT | MOD_CMD) == 0 {
+            flags ^= 0x2_0000; // tự viết hoa (nếu Shift đã bật thì thành chữ thường, như Shift+Caps)
+        }
         if (123..=126).contains(&d.code) {
             flags |= 0x80_0000 | 0x20_0000; // phím mũi tên mang cờ Fn + NumericPad như bàn phím thật
         }
         crate::macos::post_key(d.code, flags);
+        // Cập nhật trạng thái tự viết hoa: Return -> hoa; Space sau ". ? !" -> hoa; chữ/số/dấu khác -> thường.
+        let next_cap = match d.code {
+            36 => true,                                   // Return
+            51 => cap,                                    // Backspace: giữ nguyên
+            49 => cap || KBD_LAST_END.load(Ordering::SeqCst), // Space
+            _ => false,
+        };
+        KBD_LAST_END.store(matches!(d.label, "." | "?" | "!") || (mods & MOD_SHIFT != 0 && matches!(d.shift, "?" | "!")), Ordering::SeqCst);
+        KBD_CAP.store(next_cap, Ordering::SeqCst);
         KBD_MODS.store(mods & MOD_CAPS, Ordering::SeqCst);
         kbd_refresh();
     }

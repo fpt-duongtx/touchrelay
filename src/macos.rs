@@ -888,10 +888,14 @@ impl App {
         let focus = if pid == Some(std::process::id() as i32) { None } else { crate::snap::focus_info(pid) };
         match focus {
             Some(f) if f.is_text => {
+                if self.keyboard && menubar::kbd_visible() {
+                    menubar::kbd_set_autocap(f.at_sentence_start == Some(true));
+                }
                 if self.keyboard && !self.kbd_dismissed && !menubar::kbd_visible() {
                     let (bounds, main_h) = self.overlay_geometry();
                     let avoid = f.frame.map(|(p, s)| (p.x, p.y, s.x, s.y));
                     menubar::kbd_show(bounds, main_h, avoid);
+                    menubar::kbd_set_autocap(f.at_sentence_start == Some(true));
                 }
             }
             Some(_) => {
