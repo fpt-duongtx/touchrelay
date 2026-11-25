@@ -174,8 +174,13 @@ pub(crate) fn post_key(code: u16, flags: u64) {
 
 unsafe fn mouse(t: u32, at: P, button: u32, clicks: i64) {
     let e = CGEventCreateMouseEvent(ptr::null(), t, pt(at), button);
-    if !e.is_null() && clicks > 0 {
-        CGEventSetIntegerValueField(e, kCGMouseEventClickState, clicks);
+    if !e.is_null() {
+        // Chạm KHÔNG bao giờ mang phím bổ trợ: sau vuốt 3 ngón (Ctrl+mũi tên) cờ Ctrl có thể còn kẹt trong trạng thái
+        // phiên, khiến click trái thành Ctrl-click = mở context menu.
+        CGEventSetFlags(e, 0);
+        if clicks > 0 {
+            CGEventSetIntegerValueField(e, kCGMouseEventClickState, clicks);
+        }
     }
     post(e);
 }

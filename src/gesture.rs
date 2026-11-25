@@ -467,10 +467,21 @@ impl Engine {
                 start_t,
             } => {
                 if n < 2 {
-                    if now - start_t <= self.cfg.tap_max_time {
-                        self.click(&mut out, Button::Right, start_c, now);
+                    let dur = now - start_t;
+                    if dur < 0.07 {
+                        // Ngón "ma" thứ hai chỉ thoáng qua vài frame (cảm biến ILITEK, hay gặp ngay sau khi chạm nhiều ngón):
+                        // không phải chạm 2 ngón thật → coi như chạm 1 ngón, KHÔNG click phải.
+                        if n == 1 {
+                            self.enter(touches, now, &mut out);
+                        } else {
+                            self.state = State::Idle;
+                        }
+                    } else {
+                        if dur <= self.cfg.tap_max_time {
+                            self.click(&mut out, Button::Right, start_c, now);
+                        }
+                        self.state = if n == 0 { State::Idle } else { State::Hold };
                     }
-                    self.state = if n == 0 { State::Idle } else { State::Hold };
                 } else if n >= 3 {
                     self.enter(touches, now, &mut out);
                 } else {
@@ -735,6 +746,18 @@ mod tests {
         e.update(&[t(1, 100.0, 100.0)], 0.06);
         let a = e.update(&[], 0.08);
         assert!(has(&a, |x| matches!(x, Action::MouseDown { at, .. } if at.dist(P::new(100.0, 100.0)) < 0.5)));
+    }
+
+    #[test]
+    fn ghost_second_finger_does_not_right_click() {
+        let mut e = Engine::new(Config::default());
+        // Frame đầu có thêm một ngón ma, 20ms sau chỉ còn 1 ngón thật: phải thành click TRÁI, không phải click phải.
+        e.update(&[t(1, 100.0, 100.0), t(2, 300.0, 300.0)], 0.0);
+        let mut all = e.update(&[t(1, 100.0, 100.0)], 0.02);
+        all.extend(e.update(&[t(1, 100.0, 100.0)], 0.06));
+        all.extend(e.update(&[], 0.10));
+        assert!(has(&all, |x| matches!(x, Action::MouseDown { button: Button::Left, .. })));
+        assert!(!has(&all, |x| matches!(x, Action::MouseDown { button: Button::Right, .. })));
     }
 
     #[test]
