@@ -8,22 +8,32 @@ Pure Rust, **no dependencies**. IOKit, CoreFoundation and CoreGraphics are calle
 
 > **Unofficial and unsigned.** Not affiliated with Apple or any touchscreen maker. Read the [disclaimer](DISCLAIMER.md) before use.
 
+## Screenshots
+
+| | | |
+|---|---|---|
+| ![Menu](docs/img/menu-sm.jpg) | ![General](docs/img/general-sm.png) | ![Scrolling and gestures](docs/img/scrolling-sm.png) |
+| ![On-screen keyboard](docs/img/keyboard-sm.png) | ![Display](docs/img/display-sm.png) | ![Tools](docs/img/tools-sm.png) |
+
 ## Gestures
 
 | On the touchscreen | Result on macOS |
 |---|---|
 | Tap with 1 finger | Left click (two quick taps = double click) |
-| Drag with 1 finger | Scroll, iPad style (can be turned into mouse drag) |
-| Hold still ~0.3 s, then drag | Mouse drag: sliders, text selection, windows, files |
+| Drag with 1 finger | **Smart:** mouse drag on sliders, scroll bars, window title bars and one-line text fields; scroll on scrollable content (web pages, lists) |
+| Hold still ~0.3 s, then drag | Mouse drag anywhere: selection, files, windows |
 | Drag with 2 fingers | Smooth pixel scrolling with **momentum** |
 | Tap with 2 fingers | Right click |
 | Pinch / spread | Zoom (Safari, Preview, Maps…) |
 | Swipe 3 fingers left / right | Switch Space or full-screen app |
 | Swipe 3 fingers up / down | Mission Control / App Exposé |
+| Tap twice with 3 fingers, or hold 3 fingers still for 3 s | Show / hide the on-screen keyboard |
 | Touch while gliding | Stops the scroll |
 
 ## Features
 
+- **Smart drag**: one-finger drag picks mouse drag or scroll from what is under your finger (via Accessibility), so you rarely need the hold-to-drag.
+- **On-screen keyboard**: a compact floating keyboard (physical layout, no function row; three sizes) that appears when you tap a text field. Drag its top bar to move it; tap twice with 3 fingers to show or hide it by hand. Keys send real key codes, so Vietnamese Telex/VNI input methods work, and a 🌐 key switches the input language (it shows the current one, e.g. EN or VI).
 - **Hot-plug**: unplug and replug the screen any time.
 - **Smart tap**: if a tap just misses a small button, TouchRelay uses the Accessibility API to pick the nearest control within ~20 points.
 - **Touch calibration**: tap 9 marks to correct a sensor that is not linear near the edges (the one it was developed on is not).
@@ -31,7 +41,7 @@ Pure Rust, **no dependencies**. IOKit, CoreFoundation and CoreGraphics are calle
 - **Screen test**: solid colours to spot dead pixels.
 - **Interface size**: temporarily enlarge the UI on the touchscreen (only 2× is sharp on most panels).
 - **Pointer hiding**: the pointer is hidden while you use touch and comes back when you move a mouse or trackpad.
-- Native settings window (sidebar + grouped forms), English and Vietnamese UI that follows the system language.
+- Native settings window (sidebar + grouped forms), English and Vietnamese UI that follows the system language by default; pick a language in Settings or the menu (Language ▸) to override it.
 
 ## Tested hardware
 
@@ -106,18 +116,22 @@ Turn both on for TouchRelay, then reopen it. If the app is listed but still refu
 
 ## Using it
 
-TouchRelay lives in the menu bar (☝︎ icon, no Dock icon). Frequent switches are at the top level; the rest is grouped:
+TouchRelay lives in the menu bar (☝︎ icon, no Dock icon). The menu is grouped by purpose:
 
-- **Pause**, **Smart tap**, **Hide pointer while touching**
-- **Scroll speed ▸**, **Scrolling & gestures ▸**, **Display ▸** (target display, orientation, interface size)
-- **Tools ▸**: calibration, touch area test, screen test, gesture guide, troubleshooting, command-line options, log
-- **Settings…** (⌘,), Open at login, About, Quit
+- **Quick switches:** Pause, Smart tap, Hide pointer while touching
+- **On-screen keyboard ▸:** auto-show, show now, size
+- **Scrolling & gestures ▸:** scroll speed, reverse direction, momentum, one-finger scroll, smart drag, pinch, three-finger swipe, swipe sensitivity
+- **Display ▸:** target display, orientation, interface size
+- **Tools ▸:** calibration, touch area test, screen test, gesture guide, troubleshooting, command-line options, log
+- **App:** Settings… (⌘,), Language ▸, Open at login, About, Quit
+
+The Settings window mirrors this: General, Scrolling & gestures, Keyboard, Display, Tools, About.
 
 Settings are stored in `~/Library/Application Support/touchrelay/settings.txt`, the log in `~/Library/Logs/touchrelay.log`.
 
 ### Touch is slightly off or the menu bar can't be tapped
 
-1. Open the **Tools** page in Settings and run **Touch area test**. Sweep a finger over the whole screen, including the four edges, then tap with 4 fingers. If the edges stay dark, the sensor does not cover them; TouchRelay stretches the reachable range to the screen edge.
+1. Open the **Tools** page in Settings and run **Touch area test**. Sweep a finger over the whole screen, including the four edges, then tap with 3 fingers. If the edges stay dark, the sensor does not cover them; TouchRelay stretches the reachable range to the screen edge.
 2. If taps are still off, run **Touch calibration** (9 marks).
 3. If you changed the display resolution afterwards, the saved calibration is switched off automatically (it only applies to the resolution it was made for).
 

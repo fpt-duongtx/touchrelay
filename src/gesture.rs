@@ -101,6 +101,8 @@ pub enum Action {
     },
     /// Ctrl + phím mũi tên
     CtrlKey(Key),
+    /// Chạm 2 lần bằng 3 ngón, hoặc giữ yên 3 ngón 3 giây: hiện/ẩn bàn phím ảo (khi app không nhận ra ô nhập).
+    ToggleKeyboard,
 }
 
 #[derive(Clone, Debug)]
@@ -110,11 +112,18 @@ pub struct Config {
     pub long_press_time: f64,
     /// Với kéo-1-ngón-để-cuộn: giữ yên ngón ≥ thời gian này rồi kéo thì thành kéo chuột (thanh trượt, chọn chữ).
     pub drag_hold_time: f64,
+    /// Giữ yên 3 ngón từng này giây thì hiện/ẩn bàn phím ảo.
+    pub kbd_hold_time: f64,
     pub double_click_time: f64,
     pub double_click_slop: f64,
     pub scroll_slop: f64,
     pub pinch_slop: f64,
-    pub swipe_distance: f64,
+    /// Quãng vuốt ngang / dọc (điểm màn hình) để tính là một cú vuốt nhiều ngón. App đặt theo kích thước màn hình
+    /// và độ nhạy người dùng chọn; mặc định này dùng cho test.
+    pub swipe_distance_x: f64,
+    pub swipe_distance_y: f64,
+    /// Hướng chính phải trội hơn hướng kia bấy nhiêu lần mới tính là vuốt (tránh vuốt chéo/nhích tay).
+    pub swipe_dominance: f64,
     pub one_finger_scroll: bool,
     pub momentum: bool,
     /// Hệ số giảm tốc mỗi mili-giây (giống UIScrollView: 0.998 = normal).
@@ -131,11 +140,14 @@ impl Default for Config {
             tap_max_time: 0.35,
             long_press_time: 0.55,
             drag_hold_time: 0.3,
+            kbd_hold_time: 3.0,
             double_click_time: 0.4,
             double_click_slop: 25.0,
             scroll_slop: 8.0,
             pinch_slop: 25.0,
-            swipe_distance: 120.0,
+            swipe_distance_x: 120.0,
+            swipe_distance_y: 120.0,
+            swipe_dominance: 1.5,
             one_finger_scroll: false,
             momentum: true,
             deceleration_per_ms: 0.998,
@@ -174,9 +186,20 @@ enum State {
         last_d: f64,
         at: P,
     },
+    /// 3 ngón trở lên: vuốt 3 ngón, hoặc chạm/giữ 3 ngón để hiện/ẩn bàn phím ảo.
     Three {
         start_c: P,
         done: bool,
+        start_t: f64,
+        max_n: usize,
+        moved: bool,
+        /// Số ngón đang chạm lúc này (cảm biến hay nhấp nháy số ngón; cần ≥3 lúc kiểm tra), thấy 4),
+        /// và đã phát ToggleKeyboard do giữ 3 ngón chưa.
+        cur_n: usize,
+        held_fired: bool,
+        /// Vị trí đầu tiên của từng ngón (theo id): đo "đã di chuyển" theo từng ngón, không theo trọng tâm,
+        /// vì cảm biến hay báo 3↔4 ngón làm trọng tâm nhảy.
+        starts: Vec<(u32, P)>,
     },
     /// Đã xử lý xong cử chỉ, chờ nhấc hết tay.
     Hold,
@@ -232,6 +255,11 @@ pub struct Engine {
     state: State,
     momentum: Option<Momentum>,
     last_click: Option<(f64, P, i64)>,
+    /// Thời điểm lần chạm 3 ngón gần nhất (để nhận chạm đôi).
+    last_multi_tap: Option<f64>,
+    /// Hỏi "chạm ở điểm này thì kéo 1 ngón nên là kéo chuột hay cuộn?": `Some(true)` = kéo chuột,
+    /// `Some(false)` = cuộn, `None` = không biết. Chỉ dùng khi bật kéo-1-ngón-để-cuộn và chưa giữ đủ lâu.
+    pub intent_probe: Option<Box<dyn FnMut(P) -> Option<bool>>>,
 }
 
 fn centroid(t: &[Touch]) -> P {
@@ -269,6 +297,8 @@ impl Engine {
             state: State::Idle,
             momentum: None,
             last_click: None,
+            last_multi_tap: None,
+            intent_probe: None,
         }
     }
 
@@ -336,6 +366,12 @@ impl Engine {
             _ => State::Three {
                 start_c: centroid(touches),
                 done: false,
+                start_t: now,
+                max_n: touches.len(),
+                moved: false,
+                cur_n: touches.len(),
+                held_fired: false,
+                starts: touches.iter().map(|t| (t.id, t.p)).collect(),
             },
         };
     }
@@ -373,7 +409,10 @@ impl Engine {
                 } else {
                     let t = touches.iter().find(|t| t.id == id).unwrap_or(&touches[0]);
                     if t.p.dist(start) > self.cfg.tap_slop {
-                        if self.cfg.one_finger_scroll && now - start_t < self.cfg.drag_hold_time {
+                        // Kéo thông minh: nếu điểm bắt đầu là thanh trượt/thanh tiêu đề/… thì kéo chuột ngay.
+                        let quick = self.cfg.one_finger_scroll && now - start_t < self.cfg.drag_hold_time;
+                        let force_drag = quick && self.intent_probe.as_mut().and_then(|f| f(start)) == Some(true);
+                        if quick && !force_drag {
                             let mut tr = Tracker::new(start, start_t, 1);
                             let (dx, dy) = tr.step(t.p, now);
                             out.push(Action::Scroll {
@@ -510,18 +549,40 @@ impl Engine {
                 }
             }
 
-            State::Three { start_c, mut done } => {
+            State::Three { start_c, mut done, start_t, mut max_n, mut moved, held_fired, mut starts, .. } => {
                 if n == 0 {
+                    // Chạm 3 ngón nhanh, không trượt, không phải vuốt: lần thứ hai trong 0.6s = hiện/ẩn bàn phím.
+                    if max_n >= 3 && !done && !moved && now - start_t <= 0.45 {
+                        match self.last_multi_tap {
+                            Some(t) if now - t <= 0.6 => {
+                                out.push(Action::ToggleKeyboard);
+                                self.last_multi_tap = None;
+                            }
+                            _ => self.last_multi_tap = Some(now),
+                        }
+                    }
                     self.state = State::Idle;
                 } else {
+                    max_n = max_n.max(n);
+                    let c = centroid(touches);
+                    for t in touches {
+                        match starts.iter().find(|(id, _)| *id == t.id) {
+                            Some((_, p0)) => {
+                                if t.p.dist(*p0) > self.cfg.tap_slop * 4.0 {
+                                    moved = true;
+                                }
+                            }
+                            None => starts.push((t.id, t.p)),
+                        }
+                    }
                     if !done && n >= 3 && self.cfg.three_finger_swipe {
-                        let c = centroid(touches);
                         let (dx, dy) = (c.x - start_c.x, c.y - start_c.y);
-                        let s = self.cfg.swipe_distance;
-                        let key = if dx.abs() > s && dx.abs() > dy.abs() {
+                        let (sx, sy, dom) = (self.cfg.swipe_distance_x, self.cfg.swipe_distance_y, self.cfg.swipe_dominance);
+                        // Phải đủ xa VÀ hướng chính trội rõ ràng (nhích nhẹ hay vuốt chéo thì không tính).
+                        let key = if dx.abs() > sx && dx.abs() > dy.abs() * dom {
                             // Vuốt sang phải -> về Space bên trái (như trackpad)
                             Some(if dx > 0.0 { Key::Left } else { Key::Right })
-                        } else if dy.abs() > s {
+                        } else if dy.abs() > sy && dy.abs() > dx.abs() * dom {
                             Some(if dy < 0.0 { Key::Up } else { Key::Down })
                         } else {
                             None
@@ -531,7 +592,7 @@ impl Engine {
                             done = true;
                         }
                     }
-                    self.state = State::Three { start_c, done };
+                    self.state = State::Three { start_c, done, start_t, max_n, moved, cur_n: n, held_fired, starts };
                 }
             }
 
@@ -564,6 +625,14 @@ impl Engine {
             } else if now - start_t >= self.cfg.long_press_time {
                 self.click(&mut out, Button::Right, start, now);
                 self.state = State::Hold;
+            }
+        }
+
+        // Giữ yên 3 ngón đủ lâu: hiện/ẩn bàn phím ảo (một lần cho mỗi lần đặt tay).
+        if let State::Three { start_t, moved, done, cur_n, held_fired, .. } = &mut self.state {
+            if !*held_fired && !*moved && !*done && *cur_n >= 3 && now - *start_t >= self.cfg.kbd_hold_time {
+                *held_fired = true;
+                out.push(Action::ToggleKeyboard);
             }
         }
 
@@ -904,6 +973,149 @@ mod tests {
         // Nhả ra thì nhả nút.
         let a = e.update(&[], 0.9);
         assert!(has(&a, |x| matches!(x, Action::MouseUp { button: Button::Left, .. })));
+    }
+
+    #[test]
+    fn swipe_needs_enough_distance_and_clear_direction() {
+        let cfg = Config {
+            swipe_distance_x: 300.0,
+            swipe_distance_y: 250.0,
+            ..Config::default()
+        };
+        let three = |dx: f64, dy: f64| {
+            [
+                t(1, 300.0 + dx, 300.0 + dy),
+                t(2, 360.0 + dx, 300.0 + dy),
+                t(3, 420.0 + dx, 300.0 + dy),
+            ]
+        };
+        // Nhích 150px (đủ cho ngưỡng cũ 120): giờ không còn chuyển desktop.
+        let mut e = Engine::new(cfg.clone());
+        e.update(&three(0.0, 0.0), 0.0);
+        assert!(e.update(&three(-150.0, 0.0), 0.1).is_empty());
+        // Vuốt đủ xa: chuyển một lần.
+        assert_eq!(e.update(&three(-320.0, 0.0), 0.2), vec![Action::CtrlKey(Key::Right)]);
+        assert!(e.update(&three(-500.0, 0.0), 0.3).is_empty());
+        // Vuốt chéo (ngang 320, dọc 280): hướng chính không trội 1.5 lần -> không tính.
+        let mut e = Engine::new(cfg.clone());
+        e.update(&three(0.0, 0.0), 0.0);
+        assert!(e.update(&three(-320.0, 280.0), 0.1).is_empty());
+        // Vuốt dọc cần ngưỡng dọc.
+        let mut e = Engine::new(cfg);
+        e.update(&three(0.0, 0.0), 0.0);
+        assert!(e.update(&three(0.0, -200.0), 0.1).is_empty());
+        assert_eq!(e.update(&three(0.0, -260.0), 0.2), vec![Action::CtrlKey(Key::Up)]);
+    }
+
+    #[test]
+    fn double_three_finger_tap_toggles_keyboard() {
+        let three = |dx: f64| [t(1, 300.0 + dx, 300.0), t(2, 360.0 + dx, 300.0), t(3, 420.0 + dx, 300.0)];
+        // Một lần chạm 3 ngón: chưa làm gì.
+        let mut e = Engine::new(Config::default());
+        e.update(&three(0.0), 0.0);
+        assert!(e.update(&[], 0.1).is_empty());
+        // Lần thứ hai trong 0.6s: hiện/ẩn bàn phím.
+        e.update(&three(0.0), 0.3);
+        assert_eq!(e.update(&[], 0.4), vec![Action::ToggleKeyboard]);
+        // Lần thứ ba ngay sau đó không tính thêm (đã reset).
+        e.update(&three(0.0), 0.6);
+        assert!(e.update(&[], 0.7).is_empty());
+
+        // Hai lần cách nhau quá 0.6s: không tính.
+        let mut e = Engine::new(Config::default());
+        e.update(&three(0.0), 0.0);
+        e.update(&[], 0.1);
+        e.update(&three(0.0), 1.0);
+        assert!(e.update(&[], 1.1).is_empty());
+
+        // Chạm đôi 2 ngón: không phải bàn phím.
+        let two = [t(1, 300.0, 300.0), t(2, 360.0, 300.0)];
+        let mut e = Engine::new(Config::default());
+        e.update(&two, 0.0);
+        assert!(!e.update(&[], 0.1).contains(&Action::ToggleKeyboard));
+        e.update(&two, 0.3);
+        assert!(!e.update(&[], 0.4).contains(&Action::ToggleKeyboard));
+
+        // Vuốt (trượt xa): không phải chạm, và vẫn là vuốt Space một lần.
+        let mut e = Engine::new(Config::default());
+        e.update(&three(0.0), 0.0);
+        assert_eq!(e.update(&three(-150.0), 0.1), vec![Action::CtrlKey(Key::Right)]);
+        e.update(&[], 0.2);
+        e.update(&three(0.0), 0.3);
+        e.update(&three(-150.0), 0.35);
+        assert!(!e.update(&[], 0.4).contains(&Action::ToggleKeyboard));
+
+        // Chạm lâu (>0.45s) không tính là chạm.
+        let mut e = Engine::new(Config::default());
+        e.update(&three(0.0), 0.0);
+        e.update(&three(0.0), 0.5);
+        e.update(&[], 0.6);
+        e.update(&three(0.0), 0.7);
+        assert!(e.update(&[], 0.75).is_empty());
+    }
+
+    #[test]
+    fn holding_three_fingers_still_toggles_keyboard_once() {
+        let three = |dx: f64| [t(1, 300.0 + dx, 300.0), t(2, 360.0 + dx, 300.0), t(3, 420.0 + dx, 300.0)];
+        let two = [t(1, 300.0, 300.0), t(2, 360.0, 300.0)];
+        let mut e = Engine::new(Config::default());
+        e.update(&three(0.0), 0.0);
+        assert!(e.tick(2.0).is_empty()); // chưa đủ 3s
+        e.update(&three(1.0), 2.5); // vẫn yên (lệch 1px)
+        assert_eq!(e.tick(3.1), vec![Action::ToggleKeyboard]);
+        // Chỉ một lần cho mỗi lần đặt tay, và nhả ra không tính thêm chạm.
+        assert!(e.tick(4.0).is_empty());
+        assert!(e.update(&[], 4.1).is_empty());
+        assert!(e.update(&three(0.0), 5.0).is_empty());
+        assert!(e.update(&[], 5.1).is_empty());
+
+        // Cảm biến nhấp nháy 3 <-> 2 ngón khi giữ yên: đến lúc còn đủ 3 ngón vẫn kích hoạt.
+        let mut e = Engine::new(Config::default());
+        e.update(&three(0.0), 0.0);
+        e.update(&two, 1.0);
+        e.update(&three(0.0), 2.0);
+        e.update(&two, 3.05);
+        assert!(e.tick(3.1).is_empty()); // đúng lúc tụt còn 2 ngón
+        e.update(&three(0.0), 3.2);
+        assert_eq!(e.tick(3.3), vec![Action::ToggleKeyboard]);
+
+        // Di chuyển trong lúc giữ: không tính.
+        let mut e = Engine::new(Config::default());
+        e.update(&three(0.0), 0.0);
+        e.update(&three(60.0), 1.0);
+        assert!(e.tick(3.5).is_empty());
+
+        // 2 ngón giữ lâu: không tính.
+        let mut e = Engine::new(Config::default());
+        e.update(&two, 0.0);
+        assert!(e.tick(3.5).is_empty());
+    }
+
+    #[test]
+    fn smart_drag_probe_chooses_mouse_drag_or_scroll() {
+        let cfg = Config {
+            one_finger_scroll: true,
+            ..Config::default()
+        };
+        // Điểm bắt đầu là thanh trượt: kéo chuột ngay (không phải giữ 0.3s).
+        let mut e = Engine::new(cfg.clone());
+        e.intent_probe = Some(Box::new(|_| Some(true)));
+        e.update(&[t(1, 100.0, 100.0)], 0.0);
+        let a = e.update(&[t(1, 140.0, 100.0)], 0.02);
+        assert!(has(&a, |x| matches!(x, Action::MouseDown { button: Button::Left, .. })));
+        assert!(!has(&a, |x| matches!(x, Action::Scroll { .. })));
+        // Điểm bắt đầu là nội dung cuộn được: cuộn.
+        let mut e = Engine::new(cfg.clone());
+        e.intent_probe = Some(Box::new(|_| Some(false)));
+        e.update(&[t(1, 100.0, 100.0)], 0.0);
+        let a = e.update(&[t(1, 100.0, 140.0)], 0.02);
+        assert!(has(&a, |x| matches!(x, Action::Scroll { .. })));
+        // Không biết: giữ mặc định (cuộn).
+        let mut e = Engine::new(cfg);
+        e.intent_probe = Some(Box::new(|_| None));
+        e.update(&[t(1, 100.0, 100.0)], 0.0);
+        let a = e.update(&[t(1, 100.0, 140.0)], 0.02);
+        assert!(has(&a, |x| matches!(x, Action::Scroll { .. })));
     }
 
     #[test]

@@ -32,7 +32,15 @@
   fail.className = "lb-fail";
   dlg.querySelector("figure").appendChild(fail);
 
+  var shots = [].slice.call(document.querySelectorAll(".shot"));
+  var cur = 0;
+  var count = document.getElementById("lightbox-count");
+
+  function go(d) { open(shots[(cur + d + shots.length) % shots.length]); }
+
   function open(shot) {
+    cur = shots.indexOf(shot);
+    count.textContent = "(" + (cur + 1) + "/" + shots.length + ")";
     var lang = document.documentElement.getAttribute("lang") === "vi" ? "vi" : "en";
     var url = shot.getAttribute("data-full");
     var text = shot.getAttribute("data-" + lang) || "";
@@ -67,5 +75,19 @@
     if (shot) { open(shot); return; }
     // Click on the backdrop or the close button closes the dialog.
     if (ev.target === dlg || ev.target.id === "lightbox-close") dlg.close();
+    if (ev.target.id === "lightbox-prev") go(-1);
+    if (ev.target.id === "lightbox-next") go(1);
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (!dlg.open) return;
+    if (ev.key === "ArrowLeft") { ev.preventDefault(); go(-1); }
+    if (ev.key === "ArrowRight") { ev.preventDefault(); go(1); }
+  });
+  var tx = null;
+  dlg.addEventListener("touchstart", function (ev) { tx = ev.touches[0].clientX; }, { passive: true });
+  dlg.addEventListener("touchend", function (ev) {
+    if (tx === null) return;
+    var dx = ev.changedTouches[0].clientX - tx; tx = null;
+    if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
   });
 })();

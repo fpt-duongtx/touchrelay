@@ -5,6 +5,7 @@ mod calib;
 mod coverage;
 mod display;
 mod i18n;
+mod input_source;
 mod snap;
 mod gesture;
 mod hid_desc;
@@ -37,6 +38,16 @@ pub struct Prefs {
     pub hide_cursor: bool,
     /// Hút vào nút gần nhất khi chạm trượt (cần Accessibility).
     pub snap: bool,
+    /// Kéo 1 ngón thông minh: tự chọn kéo chuột hay cuộn theo thứ nằm dưới ngón tay (Accessibility).
+    pub smart_drag: bool,
+    /// Tự hiện bàn phím ảo khi chạm vào ô nhập văn bản.
+    pub keyboard: bool,
+    /// Cỡ bàn phím ảo: 0 nhỏ, 1 vừa (mặc định), 2 lớn.
+    pub kbd_size: u8,
+    /// Độ nhạy vuốt nhiều ngón: 0 nhạy, 1 vừa (mặc định), 2 khó.
+    pub swipe_level: u8,
+    /// Ngôn ngữ giao diện: 0 theo hệ thống (mặc định), 1 English, 2 Tiếng Việt.
+    pub language: u8,
     /// Hiệu chỉnh vị trí chạm (các nút ánh xạ từng đoạn theo trục); None = chưa hiệu chỉnh.
     pub calib: Option<Vec<f64>>,
     /// Vùng cảm biến thật sự nhận chạm [min x, max x, min y, max y] (từ "Kiểm tra vùng chạm").
@@ -58,6 +69,11 @@ impl Default for Prefs {
             display: None,
             hide_cursor: true,
             snap: true,
+            smart_drag: true,
+            keyboard: true,
+            kbd_size: 1,
+            swipe_level: 1,
+            language: 0,
             calib: None,
             extent: None,
             calib_size: None,
@@ -110,6 +126,11 @@ impl Prefs {
                 "swipe" => p.swipe = b,
                 "hide_cursor" => p.hide_cursor = b,
                 "snap" => p.snap = b,
+                "smart_drag" => p.smart_drag = b,
+                "keyboard" => p.keyboard = b,
+                "language" => p.language = v.parse::<u8>().unwrap_or(0).min(2),
+                "swipe_level" => p.swipe_level = v.parse::<u8>().unwrap_or(1).min(2),
+                "kbd_size" => p.kbd_size = v.parse::<u8>().unwrap_or(1).min(2),
                 "orientation" => p.orientation = v.parse::<u8>().unwrap_or(0).min(2),
                 "display" => p.display = v.parse().ok(),
                 "calib" => p.calib = parse_calib(v),
@@ -128,7 +149,7 @@ impl Prefs {
         }
         let b = |x: bool| if x { 1 } else { 0 };
         let text = format!(
-            "scroll_speed={}\ninvert_scroll={}\none_finger_scroll={}\nmomentum={}\npinch={}\nswipe={}\norientation={}\nhide_cursor={}\nsnap={}\n{}",
+            "scroll_speed={}\ninvert_scroll={}\none_finger_scroll={}\nmomentum={}\npinch={}\nswipe={}\norientation={}\nhide_cursor={}\nsnap={}\nsmart_drag={}\nkeyboard={}\nkbd_size={}\nswipe_level={}\nlanguage={}\n{}",
             self.scroll_speed,
             b(self.invert_scroll),
             b(self.one_finger_scroll),
@@ -138,6 +159,11 @@ impl Prefs {
             self.orientation,
             b(self.hide_cursor),
             b(self.snap),
+            b(self.smart_drag),
+            b(self.keyboard),
+            self.kbd_size,
+            self.swipe_level,
+            self.language,
             self.display.map(|d| format!("display={d}\n")).unwrap_or_default()
         ) + &self
             .calib_size
@@ -180,6 +206,21 @@ impl Prefs {
         if !self.snap {
             f.push("--no-snap".into());
         }
+        if !self.smart_drag {
+            f.push("--no-smart-drag".into());
+        }
+        if !self.keyboard {
+            f.push("--no-keyboard".into());
+        }
+        if self.language != 0 {
+            f.extend(["--lang".into(), if self.language == 1 { "en".into() } else { "vi".into() }]);
+        }
+        if self.swipe_level != 1 {
+            f.extend(["--swipe-level".into(), self.swipe_level.to_string()]);
+        }
+        if self.kbd_size != 1 {
+            f.extend(["--kbd-size".into(), self.kbd_size.to_string()]);
+        }
         match self.orientation {
             1 => f.extend(["--swap-xy".into(), "--flip-x".into()]),
             2 => f.extend(["--swap-xy".into(), "--flip-y".into()]),
@@ -218,6 +259,16 @@ pub struct Options {
     pub hide_cursor: bool,
     /// Hút vào nút gần nhất khi chạm trượt.
     pub snap: bool,
+    /// Kéo 1 ngón thông minh (kéo chuột hay cuộn theo ngữ cảnh).
+    pub smart_drag: bool,
+    /// Tự hiện bàn phím ảo khi chạm vào ô nhập.
+    pub keyboard: bool,
+    /// Cỡ bàn phím ảo (0 nhỏ, 1 vừa, 2 lớn).
+    pub kbd_size: u8,
+    /// Độ nhạy vuốt nhiều ngón (0 nhạy, 1 vừa, 2 khó).
+    pub swipe_level: u8,
+    /// Ngôn ngữ giao diện: 0 theo hệ thống, 1 English, 2 Tiếng Việt.
+    pub language: u8,
     /// Hiệu chỉnh vị trí chạm (các nút ánh xạ từng đoạn theo trục).
     pub calib: Option<Vec<f64>>,
     pub extent: Option<Vec<f64>>,
@@ -227,6 +278,12 @@ pub struct Options {
     pub app_mode: bool,
     /// Mở cửa sổ cài đặt ngay khi khởi động (chế độ menu bar).
     pub open_settings: bool,
+    /// Với --settings: mở sẵn trang số N (0 = Chung...).
+    pub settings_page: Option<usize>,
+    /// Chụp cửa sổ Cài đặt ra file PNG (kiểm tra giao diện), cần --settings.
+    pub snapshot: Option<String>,
+    /// Hiện bàn phím ảo ngay khi khởi động (để kiểm tra).
+    pub show_keyboard: bool,
     pub gesture: gesture::Config,
 }
 
@@ -337,9 +394,15 @@ TUỲ CHỌN:
     --long-press <giây>     Thời gian giữ để click phải (mặc định 0.55)
     --keep-mouse-interface  Không chặn interface chuột giả lập của màn hình
     --calib <số,...>        Hiệu chỉnh vị trí chạm (thường do app tự lưu)
+    --lang <system|en|vi>   Ngôn ngữ giao diện (mặc định: theo hệ thống)
+    --swipe-level <0|1|2>   Độ nhạy vuốt 3-4 ngón: 0 nhạy, 1 vừa (mặc định), 2 khó (cần vuốt xa hơn)
+    --kbd-size <0|1|2>      Cỡ bàn phím ảo: 0 nhỏ, 1 vừa (mặc định), 2 lớn
+    --no-keyboard           Tắt bàn phím ảo tự hiện khi chạm vào ô nhập
+    --no-smart-drag         Tắt kéo 1 ngón thông minh (luôn cuộn, giữ 0.3s mới kéo chuột)
     --no-snap               Tắt chạm thông minh (hút vào nút gần nhất)
     --keep-cursor           Không ẩn con trỏ khi chạm
     --no-seize              Không chiếm độc quyền thiết bị (debug)
+    --show-keyboard         Như --menubar và hiện luôn bàn phím ảo
     --settings              Như --menubar và mở luôn cửa sổ cài đặt
     --menubar               Chạy kiểu app thanh menu (mặc định khi mở TouchRelay.app)
     --debug                 In layout HID, từng frame và hành động
@@ -366,12 +429,20 @@ fn parse_args(argv: Vec<String>) -> Result<Options, String> {
         no_seize: false,
         hide_cursor: true,
         snap: true,
+        smart_drag: true,
+        keyboard: true,
+        kbd_size: 1,
+        swipe_level: 1,
+        language: 0,
         calib: None,
         extent: None,
         calib_size: None,
         keep_mouse_interface: false,
         app_mode: false,
         open_settings: false,
+        settings_page: None,
+        snapshot: None,
+        show_keyboard: false,
         gesture: gesture::Config::default(),
     };
     let mut args = argv.into_iter();
@@ -407,10 +478,28 @@ fn parse_args(argv: Vec<String>) -> Result<Options, String> {
             "--no-seize" => o.no_seize = true,
             "--keep-cursor" => o.hide_cursor = false,
             "--no-snap" => o.snap = false,
+            "--no-smart-drag" => o.smart_drag = false,
+            "--no-keyboard" => o.keyboard = false,
+            "--lang" => {
+                o.language = match val("--lang")?.as_str() {
+                    "system" | "auto" => 0,
+                    "en" => 1,
+                    "vi" => 2,
+                    _ => return Err("--lang phải là system, en hoặc vi".into()),
+                }
+            }
+            "--swipe-level" => o.swipe_level = val("--swipe-level")?.parse::<u8>().map_err(|_| "--swipe-level phải là 0, 1 hoặc 2")?.min(2),
+            "--kbd-size" => o.kbd_size = val("--kbd-size")?.parse::<u8>().map_err(|_| "--kbd-size phải là 0, 1 hoặc 2")?.min(2),
             "--calib-size" => o.calib_size = Some(parse_size(&val("--calib-size")?).ok_or("--calib-size không hợp lệ")?),
             "--extent" => o.extent = Some(parse_extent(&val("--extent")?).ok_or("--extent không hợp lệ (dữ liệu do app tự lưu)")?),
             "--calib" => o.calib = Some(parse_calib(&val("--calib")?).ok_or("--calib không hợp lệ (dữ liệu do app tự lưu)")?),
             "--menubar" => o.app_mode = true,
+            "--show-keyboard" => {
+                o.app_mode = true;
+                o.show_keyboard = true;
+            }
+            "--snapshot" => o.snapshot = Some(val("--snapshot")?),
+            "--settings-page" => o.settings_page = Some(val("--settings-page")?.parse().map_err(|_| "--settings-page phải là số")?),
             "--settings" => {
                 o.app_mode = true;
                 o.open_settings = true;
@@ -432,7 +521,7 @@ fn main() {
         let mut a = Prefs::load().to_flags();
         a.extend(load_options_file());
         a
-    } else if cli.iter().any(|a| a == "--menubar" || a == "--settings") {
+    } else if cli.iter().any(|a| a == "--menubar" || a == "--settings" || a == "--show-keyboard" || a == "--settings-page" || a == "--snapshot") {
         // Chạy dạng app từ dòng lệnh: cũng dùng cài đặt đã lưu (cờ dòng lệnh ghi đè).
         let mut a = Prefs::load().to_flags();
         a.extend(cli);

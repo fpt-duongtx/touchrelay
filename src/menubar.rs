@@ -3,11 +3,13 @@
 #![allow(non_upper_case_globals)]
 
 use crate::i18n::{is_vi, set_vi, tr, APP_NAME, CONTACT_EMAIL};
+use crate::ffi::{CGDisplayBounds, CGMainDisplayID};
+use crate::gesture::P;
 use crate::macos::{request_quit, with_app};
 use std::ffi::{c_char, c_void, CString};
 use std::mem::transmute;
 use std::ptr;
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, AtomicU8, Ordering};
 
 pub type Id = *mut c_void;
 pub type Sel = *const c_void;
@@ -108,6 +110,12 @@ pub fn init_app() {
 
 /// Đọc ngôn ngữ ưu tiên của hệ thống; trả về true nếu vừa đổi.
 pub fn refresh_lang() -> bool {
+    // Người dùng chọn ngôn ngữ cụ thể thì bỏ qua ngôn ngữ hệ thống.
+    match LANG_MODE.load(Ordering::SeqCst) {
+        1 => return apply_lang(false),
+        2 => return apply_lang(true),
+        _ => {}
+    }
     unsafe {
         let defaults = msg(class("NSUserDefaults"), "standardUserDefaults");
         let langs = msg_id(defaults, "objectForKey:", ns("AppleLanguages"));
@@ -123,10 +131,32 @@ pub fn refresh_lang() -> bool {
             return false;
         }
         let vi = std::ffi::CStr::from_ptr(c).to_string_lossy().starts_with("vi");
-        let changed = vi != is_vi();
-        set_vi(vi);
-        changed
+        apply_lang(vi)
     }
+}
+
+fn apply_lang(vi: bool) -> bool {
+    let changed = vi != is_vi();
+    set_vi(vi);
+    changed
+}
+
+/// Chế độ ngôn ngữ: 0 theo hệ thống, 1 English, 2 Tiếng Việt.
+static LANG_MODE: AtomicU8 = AtomicU8::new(0);
+/// Ngôn ngữ mà menu đang hiển thị (để dựng lại menu khi đổi ngôn ngữ).
+static MENU_BUILT_VI: AtomicBool = AtomicBool::new(true);
+static LANG_MENU: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+static KBD_SIZE_MENU: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+static SWIPE_MENU: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+
+pub fn language_mode() -> u8 {
+    LANG_MODE.load(Ordering::SeqCst)
+}
+
+/// Đặt chế độ ngôn ngữ (lúc khởi động, chưa có giao diện).
+pub fn set_language_mode(m: u8) {
+    LANG_MODE.store(m.min(2), Ordering::SeqCst);
+    refresh_lang();
 }
 
 pub fn alert(title: &str, text: &str) {
@@ -172,7 +202,7 @@ static TARGET: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static STATUS_BUTTON: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static WINDOW: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 /// Item bật/tắt trong menu, theo tag (chỉ số = tag).
-static TOGGLE_ITEMS: [AtomicPtr<c_void>; 10] = [const { AtomicPtr::new(ptr::null_mut()) }; 10];
+static TOGGLE_ITEMS: [AtomicPtr<c_void>; 14] = [const { AtomicPtr::new(ptr::null_mut()) }; 14];
 /// Submenu radio: tốc độ, hướng, cỡ giao diện.
 static SPEED_MENU: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static ORIENT_MENU: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
@@ -199,9 +229,11 @@ const T_ONEFINGER: isize = 6;
 const T_PAUSE: isize = 7;
 const T_LOGIN: isize = 8;
 const T_SNAP: isize = 9;
+const T_SMARTDRAG: isize = 10;
+const T_KEYBOARD: isize = 11;
 
 /// (tag, tên trong cửa sổ, mô tả)
-const TOGGLES: [(isize, &str, &str); 9] = [
+const TOGGLES: [(isize, &str, &str); 11] = [
     (T_HIDE, "Ẩn con trỏ khi chạm", "Ẩn con trỏ khi dùng cảm ứng, hiện lại khi bạn dùng chuột hoặc trackpad."),
     (T_INVERT, "Đảo chiều cuộn", "Mặc định nội dung đi theo ngón tay (kiểu iPad). Bật để đảo hướng."),
     (T_MOMENTUM, "Cuộn quán tính", "Nội dung tiếp tục trượt và giảm dần sau khi nhấc ngón."),
@@ -214,6 +246,16 @@ const TOGGLES: [(isize, &str, &str); 9] = [
     ),
     (T_PAUSE, "Tạm dừng", "Tạm ngừng xử lý cảm ứng (chạm sẽ không có tác dụng)."),
     (T_LOGIN, "Mở cùng macOS", "Tự chạy khi đăng nhập macOS."),
+    (
+        T_KEYBOARD,
+        "Bàn phím ảo",
+        "Tự hiện bàn phím nổi khi bạn chạm vào ô nhập văn bản (cần quyền Accessibility). Chạm 2 lần bằng 3 ngón (hoặc giữ yên 3 ngón 3 giây) để hiện/ẩn thủ công. Kéo thanh trên cùng để di chuyển; gõ tiếng Việt dùng bộ gõ của hệ thống.",
+    ),
+    (
+        T_SMARTDRAG,
+        "Kéo thông minh",
+        "Kéo 1 ngón tự chọn: kéo chuột khi chạm thanh trượt, thanh cuộn, thanh tiêu đề cửa sổ hoặc ô nhập; cuộn khi chạm nội dung cuộn được (cần quyền Accessibility).",
+    ),
     (
         T_SNAP,
         "Chạm thông minh",
@@ -259,6 +301,8 @@ fn toggle_state(tag: isize) -> bool {
         T_ONEFINGER => p.one_finger_scroll,
         T_PAUSE => paused,
         T_SNAP => p.snap,
+        T_SMARTDRAG => p.smart_drag,
+        T_KEYBOARD => p.keyboard,
         T_LOGIN => unsafe { login_enabled() },
         _ => false,
     }
@@ -269,6 +313,8 @@ fn flip(tag: isize) -> bool {
     let on = match tag {
         T_HIDE => with_app(|a| a.toggle_hide_cursor()),
         T_SNAP => with_app(|a| a.toggle_snap()),
+        T_SMARTDRAG => with_app(|a| a.toggle_smart_drag()),
+        T_KEYBOARD => with_app(|a| a.toggle_keyboard()),
         T_INVERT => with_app(|a| a.toggle_invert_scroll()),
         T_MOMENTUM | T_PINCH | T_SWIPE | T_ONEFINGER => with_app(|a| {
             let c = &mut a.engine.cfg;
@@ -385,6 +431,9 @@ fn sync_menu() {
         set_radio(SPEED_MENU.load(Ordering::SeqCst), nearest_speed(p.scroll_speed));
         set_radio(ORIENT_MENU.load(Ordering::SeqCst), p.orientation as usize);
         set_radio(SCALE_MENU.load(Ordering::SeqCst), scale);
+        set_radio(LANG_MENU.load(Ordering::SeqCst), language_mode() as usize);
+        set_radio(KBD_SIZE_MENU.load(Ordering::SeqCst), p.kbd_size as usize);
+        set_radio(SWIPE_MENU.load(Ordering::SeqCst), p.swipe_level as usize);
         refresh_status(paused);
     }
     rebuild_displays();
@@ -451,7 +500,8 @@ extern "C" fn on_set_display(_this: Id, _cmd: Sel, sender: Id) {
 /// Menu chính sắp mở: đồng bộ ngôn ngữ (dựng lại nếu đổi) và các dấu chọn.
 extern "C" fn on_menu_update(_this: Id, _cmd: Sel, menu: Id) {
     unsafe {
-        if refresh_lang() {
+        refresh_lang();
+        if is_vi() != MENU_BUILT_VI.load(Ordering::SeqCst) {
             let target = TARGET.load(Ordering::SeqCst);
             msg(menu, "removeAllItems");
             build_menu(menu, target);
@@ -465,7 +515,7 @@ extern "C" fn on_menu_update(_this: Id, _cmd: Sel, menu: Id) {
 extern "C" fn on_help(_this: Id, _cmd: Sel, _sender: Id) {
     refresh_lang();
     let text = tr(
-        "☝︎  Chạm 1 ngón: click\n☝︎  Chạm 2 lần nhanh: double-click\n☝︎  Kéo 1 ngón: cuộn trang\n☝︎  Giữ yên 1 ngón ~0.3s rồi kéo: kéo chuột (thanh trượt, chọn chữ, kéo cửa sổ)\n✌︎  Chạm 2 ngón: click phải\n✌︎  Kéo 2 ngón: cuộn (có quán tính)\n✌︎  Chụm / xoè 2 ngón: phóng to, thu nhỏ\n✋  Vuốt 3 ngón trái/phải: chuyển Space\n✋  Vuốt 3 ngón lên/xuống: Mission Control / App Exposé\n\n{tip}",
+        "☝︎  Chạm 1 ngón: click\n☝︎  Chạm 2 lần nhanh: double-click\n☝︎  Kéo 1 ngón: cuộn trang\n☝︎  Giữ yên 1 ngón ~0.3s rồi kéo: kéo chuột (thanh trượt, chọn chữ, kéo cửa sổ)\n✌︎  Chạm 2 ngón: click phải\n✌︎  Kéo 2 ngón: cuộn (có quán tính)\n✌︎  Chụm / xoè 2 ngón: phóng to, thu nhỏ\n✋  Vuốt 3 ngón trái/phải: chuyển Space\n✋  Vuốt 3 ngón lên/xuống: Mission Control / App Exposé\n🖐  Chạm 2 lần bằng 3 ngón, hoặc giữ yên 3 ngón 3 giây: hiện/ẩn bàn phím ảo\n\n{tip}",
     )
     .replace("{tip}", &tr("Cuộn nhanh hoặc chậm quá? Chỉnh ở \"Cài đặt…\" → Tốc độ cuộn."));
     alert(&tr("Cử chỉ trên màn hình cảm ứng"), &text);
@@ -782,16 +832,116 @@ unsafe fn footnote(page: Id, top: f64, cw: f64, text: &str) -> f64 {
 // Trang của sidebar: (biểu tượng SF Symbol, khoá tên)
 const PAGES: [(&str, &str); 6] = [
     ("gearshape", "Chung"),
-    ("arrow.up.and.down.and.arrow.left.and.right", "Cuộn"),
-    ("hand.tap", "Cử chỉ"),
+    ("hand.tap", "Cuộn & cử chỉ"),
+    ("keyboard", "Bàn phím"),
     ("display", "Màn hình"),
     ("wrench.and.screwdriver", "Công cụ"),
     ("info.circle", "Giới thiệu"),
 ];
 
+static DEBUG_UI: AtomicBool = AtomicBool::new(false);
+
+pub fn set_debug_ui(on: bool) {
+    DEBUG_UI.store(on, Ordering::SeqCst);
+}
+
+/// Chọn một trang trong sidebar Cài đặt (dùng cho kiểm tra: `--settings-page N`).
+pub fn select_page(n: usize) {
+    unsafe {
+        let table = TABLE.load(Ordering::SeqCst);
+        if table.is_null() {
+            return;
+        }
+        let idx = msg_int(class("NSIndexSet"), "indexSetWithIndex:", n.min(PAGES.len() - 1) as isize);
+        let g: extern "C" fn(Id, Sel, Id, bool) = transmute(imp());
+        g(table, sel("selectRowIndexes:byExtendingSelection:"), idx, false);
+    }
+}
+
+unsafe fn msg_ret_f64(o: Id, s: &str) -> f64 {
+    let f: extern "C" fn(Id, Sel) -> f64 = transmute(imp());
+    f(o, sel(s))
+}
+
+/// In trạng thái cuộn của cửa sổ Cài đặt (chỉ khi --debug).
+unsafe fn debug_scroll_state(scroll: Id, doc_h: f64) {
+    if !DEBUG_UI.load(Ordering::SeqCst) {
+        return;
+    }
+    let vs = msg(scroll, "verticalScroller");
+    let clip = msg(scroll, "contentView");
+    let bounds = msg_ret_rect(clip, "bounds");
+    eprintln!(
+        "[ui] trang={} scrollerStyle={} (0=legacy luôn hiện, 1=overlay khi cuộn) hasVerticalScroller={} autohides={} scroller.hidden={} scroller.alpha={:.2} knobProportion={:.3} tài liệu cao={doc_h:.0} khung nhìn cao={:.0}",
+        SELECTED.load(Ordering::SeqCst),
+        msg_ret_int(scroll, "scrollerStyle"),
+        msg_ret_int(scroll, "hasVerticalScroller") & 0xff,
+        msg_ret_int(scroll, "autohidesScrollers") & 0xff,
+        if vs.is_null() { -1 } else { msg_ret_int(vs, "isHidden") & 0xff },
+        if vs.is_null() { -1.0 } else { msg_ret_f64(vs, "alphaValue") },
+        if vs.is_null() { -1.0 } else { msg_ret_f64(vs, "knobProportion") },
+        bounds.h,
+    );
+}
+
+static SNAP_PATH: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Chụp cửa sổ Cài đặt thành PNG sau `delay` giây (kiểm tra giao diện không cần quyền ghi màn hình).
+pub fn schedule_snapshot(path: &str, delay: f64) {
+    if let Ok(mut p) = SNAP_PATH.lock() {
+        *p = Some(path.to_string());
+    }
+    unsafe {
+        let target = TARGET.load(Ordering::SeqCst);
+        if target.is_null() {
+            return;
+        }
+        let f: extern "C" fn(Id, Sel, Sel, Id, f64) = transmute(imp());
+        f(target, sel("performSelector:withObject:afterDelay:"), sel("debugSnapshot:"), NIL, delay);
+    }
+}
+
+extern "C" fn on_settings_scrolled(_this: Id, _cmd: Sel, _note: Id) {
+    let scroll = DETAIL.load(Ordering::SeqCst);
+    if !scroll.is_null() {
+        unsafe { msg(scroll, "flashScrollers") };
+    }
+}
+
+extern "C" fn on_debug_snapshot(_this: Id, _cmd: Sel, _sender: Id) {
+    unsafe {
+        let Some(path) = SNAP_PATH.lock().ok().and_then(|mut p| p.take()) else { return };
+        let win = WINDOW.load(Ordering::SeqCst);
+        if win.is_null() {
+            return;
+        }
+        let view = msg(win, "contentView");
+        let b = msg_ret_rect(view, "bounds");
+        let rep = msg_rect(view, "bitmapImageRepForCachingDisplayInRect:", b);
+        if rep.is_null() {
+            return;
+        }
+        let f: extern "C" fn(Id, Sel, Rect, Id) = transmute(imp());
+        f(view, sel("cacheDisplayInRect:toBitmapImageRep:"), b, rep);
+        let g: extern "C" fn(Id, Sel, isize, Id) -> Id = transmute(imp());
+        let png = g(rep, sel("representationUsingType:properties:"), 4, NIL); // NSBitmapImageFileTypePNG
+        if !png.is_null() {
+            let w: extern "C" fn(Id, Sel, Id, bool) -> bool = transmute(imp());
+            w(png, sel("writeToFile:atomically:"), ns(&path), true);
+        }
+        eprintln!("[ui] đã chụp cửa sổ Cài đặt: {path}");
+    }
+}
+
 static DETAIL: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static TABLE: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static SELECTED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Tiêu đề nhỏ phía trên một nhóm (khi một trang có nhiều nhóm). Trả về mép trên của nhóm.
+unsafe fn section_title(page: Id, top: f64, text: &str) -> f64 {
+    label(page, text, Rect { x: PAD + GPAD, y: top - 18.0, w: 360.0, h: 18.0 }, 12.0, true, true);
+    top - 18.0 - 6.0
+}
 
 /// Dựng nội dung trang `idx` vào `detail` (view có chiều cao `h`, gốc dưới-trái); trả về mép dưới nội dung.
 unsafe fn build_page(detail: Id, idx: usize, h: f64) -> f64 {
@@ -806,14 +956,31 @@ unsafe fn build_page(detail: Id, idx: usize, h: f64) -> f64 {
     let top = title_top - 28.0 - GAP;
 
     let y_end = match idx {
+        // Chung: việc hằng ngày của app.
         0 => {
-            let rows = [switch_row(T_SNAP), switch_row(T_HIDE), switch_row(T_LOGIN), switch_row(T_PAUSE)];
+            let rows = [
+                RowSpec {
+                    title: tr("Ngôn ngữ"),
+                    desc: tr("Chọn ngôn ngữ của TouchRelay, hoặc theo ngôn ngữ của hệ điều hành."),
+                    ctl: Ctl::Popup {
+                        items: vec![tr("Theo hệ thống"), "English".to_string(), "Tiếng Việt".to_string()],
+                        selected: language_mode() as usize,
+                        action: "popLang:",
+                    },
+                },
+                switch_row(T_LOGIN),
+                switch_row(T_PAUSE),
+                switch_row(T_HIDE),
+                switch_row(T_SNAP),
+            ];
             let y = group(detail, target, top, cw, &rows);
             let state = tr(if with_app(|a| a.paused) { "Đang tạm dừng" } else { "Đang hoạt động" });
             footnote(detail, y, cw, &format!("{state} · {}", devices.replace('\n', " · ")))
         }
+        // Cuộn & cử chỉ: hai nhóm có tiêu đề.
         1 => {
             let speeds: Vec<String> = SPEEDS.iter().map(|s| tr(s.0)).collect();
+            let swipe_levels: Vec<String> = ["Nhạy", "Vừa (mặc định)", "Khó (vuốt xa hơn)"].iter().map(|s| tr(s)).collect();
             let rows = [
                 RowSpec {
                     title: tr("Tốc độ cuộn"),
@@ -823,11 +990,35 @@ unsafe fn build_page(detail: Id, idx: usize, h: f64) -> f64 {
                 switch_row(T_INVERT),
                 switch_row(T_MOMENTUM),
             ];
-            group(detail, target, top, cw, &rows)
+            let t = section_title(detail, top, &tr("Cuộn"));
+            let y = group(detail, target, t, cw, &rows);
+            let rows = [
+                switch_row(T_ONEFINGER),
+                switch_row(T_SMARTDRAG),
+                switch_row(T_PINCH),
+                switch_row(T_SWIPE),
+                RowSpec {
+                    title: tr("Độ nhạy vuốt nhiều ngón"),
+                    desc: tr("Quãng phải vuốt bằng 3–4 ngón để chuyển desktop. Chọn \"Khó\" nếu hay bị chuyển nhầm khi nhích tay."),
+                    ctl: Ctl::Popup { items: swipe_levels, selected: p.swipe_level as usize, action: "popSwipe:" },
+                },
+            ];
+            let t = section_title(detail, y - GAP, &tr("Cử chỉ"));
+            group(detail, target, t, cw, &rows)
         }
+        // Bàn phím ảo.
         2 => {
-            let rows = [switch_row(T_PINCH), switch_row(T_SWIPE), switch_row(T_ONEFINGER)];
-            group(detail, target, top, cw, &rows)
+            let kbd_sizes: Vec<String> = ["Nhỏ", "Vừa (mặc định)", "Lớn"].iter().map(|s| tr(s)).collect();
+            let rows = [
+                switch_row(T_KEYBOARD),
+                RowSpec {
+                    title: tr("Cỡ bàn phím"),
+                    desc: tr("Chọn kích thước phím cho vừa ngón tay và màn hình."),
+                    ctl: Ctl::Popup { items: kbd_sizes, selected: p.kbd_size as usize, action: "popKbdSize:" },
+                },
+            ];
+            let y = group(detail, target, top, cw, &rows);
+            footnote(detail, y, cw, &tr("Chạm 2 lần bằng 3 ngón, hoặc giữ yên 3 ngón 3 giây, để hiện/ẩn bàn phím bất cứ lúc nào."))
         }
         3 => {
             let mut targets = vec![tr("Tự động (màn hình rời)")];
@@ -943,6 +1134,7 @@ unsafe fn show_page(idx: usize) {
     let f: extern "C" fn(Id, Sel, Point) = transmute(imp());
     f(clip, sel("scrollToPoint:"), Point { x: 0.0, y: h - WIN_H });
     msg_id(scroll, "reflectScrolledClipView:", clip);
+    debug_scroll_state(scroll, h);
     if h > WIN_H + 0.5 {
         msg(scroll, "flashScrollers"); // báo hiệu còn nội dung bên dưới (chỉ có tác dụng với thanh cuộn kiểu overlay)
     }
@@ -1028,6 +1220,11 @@ extern "C" fn on_open_mail(_this: Id, _cmd: Sel, _sender: Id) {
 
 extern "C" fn on_win_close(_this: Id, _cmd: Sel, _sender: Id) {
     unsafe {
+        let nc = msg(class("NSNotificationCenter"), "defaultCenter");
+        let target = TARGET.load(Ordering::SeqCst);
+        if !target.is_null() {
+            msg_id(nc, "removeObserver:", target);
+        }
         let w = WINDOW.swap(ptr::null_mut(), Ordering::SeqCst);
         DETAIL.store(ptr::null_mut(), Ordering::SeqCst);
         TABLE.store(ptr::null_mut(), Ordering::SeqCst);
@@ -1076,7 +1273,16 @@ pub fn open_settings() {
         // Không để AppKit tự đệm theo titlebar: nếu có, trang ngắn vẫn "dư" ~28pt và cuộn được/hiện thanh cuộn.
         msg_bool(detail, "setAutomaticallyAdjustsContentInsets:", false);
         msg_insets(detail, "setContentInsets:", Insets { top: 0.0, left: 0.0, bottom: 0.0, right: 0.0 });
-        // Kiểu thanh cuộn (luôn hiện / khi cuộn) giữ mặc định: theo cài đặt "Show scroll bars" của macOS.
+        // Kiểu thanh cuộn (luôn hiện / khi cuộn) theo cài đặt "Show scroll bars" của macOS.
+        let pref = msg_ret_int(class("NSScroller"), "preferredScrollerStyle");
+        msg_int(detail, "setScrollerStyle:", pref);
+        // Mỗi khi nội dung cuộn thì cho thanh cuộn hiện lên (kiểu overlay): chỉ với bản tự phát sự kiện cuộn,
+        // AppKit không phải lúc nào cũng tự hiện thanh. Kiểu "luôn hiện" thì lệnh này không đổi gì.
+        let clip = msg(detail, "contentView");
+        msg_bool(clip, "setPostsBoundsChangedNotifications:", true);
+        let nc = msg(class("NSNotificationCenter"), "defaultCenter");
+        let f: extern "C" fn(Id, Sel, Id, Sel, Id, Id) = transmute(imp());
+        f(nc, sel("addObserver:selector:name:object:"), target, sel("settingsScrolled:"), ns("NSViewBoundsDidChangeNotification"), clip);
         msg_id(content, "addSubview:", detail);
         DETAIL.store(detail, Ordering::SeqCst);
 
@@ -1295,7 +1501,7 @@ pub fn overlay_touch_ui(bounds: (f64, f64, f64, f64), main_h: f64) {
             l
         };
         mk(&tr("Rê ngón tay khắp màn hình, kể cả sát bốn mép"), bh - 80.0, 28.0, true, color("whiteColor"));
-        mk(&tr("Vàng = nhận chạm · chạm 4 ngón để kết thúc"), bh - 116.0, 16.0, false, color("secondaryLabelColor"));
+        mk(&tr("Vàng = nhận chạm · chạm 3 ngón để kết thúc"), bh - 116.0, 16.0, false, color("secondaryLabelColor"));
         let info = mk("", bh - 150.0, 16.0, true, msg_rgba(class("NSColor"), "colorWithSRGBRed:green:blue:alpha:", 1.0, 0.84, 0.04, 1.0));
         msg(info, "retain");
         PROBE_INFO.store(info, Ordering::SeqCst);
@@ -1338,6 +1544,525 @@ extern "C" fn on_start_screen_test(_this: Id, _cmd: Sel, _sender: Id) {
     with_app(|a| a.start_screen_test());
 }
 
+// ---------- bàn phím ảo nổi ----------
+// Panel không kích hoạt (không cướp focus của app đang gõ), 5 hàng phím như bàn phím vật lý (không có hàng F),
+// kéo được bằng thanh trên cùng. Phím gửi MÃ PHÍM thật (CGEvent) nên bộ gõ của hệ thống (Telex/VNI) vẫn hoạt động.
+
+#[derive(Clone, Copy, PartialEq)]
+enum KeyKind {
+    Char,
+    Shift,
+    Ctrl,
+    Opt,
+    Cmd,
+    Caps,
+    /// Giữ để lặp (Backspace, mũi tên).
+    Repeat,
+    /// Đổi nguồn nhập (ngôn ngữ bàn phím); nhãn hiện mã ngôn ngữ hiện tại.
+    Lang,
+}
+
+struct KeyDef {
+    label: &'static str,
+    shift: &'static str,
+    code: u16,
+    w: f64,
+    kind: KeyKind,
+}
+
+const fn kd(label: &'static str, shift: &'static str, code: u16, w: f64, kind: KeyKind) -> KeyDef {
+    KeyDef { label, shift, code, w, kind }
+}
+
+use KeyKind::{Caps, Char, Cmd, Ctrl, Lang, Opt, Repeat, Shift};
+
+// Bố cục ANSI (US). Mỗi hàng tổng 15 đơn vị bề rộng.
+const ROW1: [KeyDef; 14] = [
+    kd("`", "~", 50, 1.0, Char),
+    kd("1", "!", 18, 1.0, Char),
+    kd("2", "@", 19, 1.0, Char),
+    kd("3", "#", 20, 1.0, Char),
+    kd("4", "$", 21, 1.0, Char),
+    kd("5", "%", 23, 1.0, Char),
+    kd("6", "^", 22, 1.0, Char),
+    kd("7", "&", 26, 1.0, Char),
+    kd("8", "*", 28, 1.0, Char),
+    kd("9", "(", 25, 1.0, Char),
+    kd("0", ")", 29, 1.0, Char),
+    kd("-", "_", 27, 1.0, Char),
+    kd("=", "+", 24, 1.0, Char),
+    kd("⌫", "⌫", 51, 2.0, Repeat),
+];
+const ROW2: [KeyDef; 14] = [
+    kd("⇥", "⇥", 48, 1.5, Char),
+    kd("q", "Q", 12, 1.0, Char),
+    kd("w", "W", 13, 1.0, Char),
+    kd("e", "E", 14, 1.0, Char),
+    kd("r", "R", 15, 1.0, Char),
+    kd("t", "T", 17, 1.0, Char),
+    kd("y", "Y", 16, 1.0, Char),
+    kd("u", "U", 32, 1.0, Char),
+    kd("i", "I", 34, 1.0, Char),
+    kd("o", "O", 31, 1.0, Char),
+    kd("p", "P", 35, 1.0, Char),
+    kd("[", "{", 33, 1.0, Char),
+    kd("]", "}", 30, 1.0, Char),
+    kd("\\", "|", 42, 1.5, Char),
+];
+const ROW3: [KeyDef; 13] = [
+    kd("⇪", "⇪", 57, 1.75, Caps),
+    kd("a", "A", 0, 1.0, Char),
+    kd("s", "S", 1, 1.0, Char),
+    kd("d", "D", 2, 1.0, Char),
+    kd("f", "F", 3, 1.0, Char),
+    kd("g", "G", 5, 1.0, Char),
+    kd("h", "H", 4, 1.0, Char),
+    kd("j", "J", 38, 1.0, Char),
+    kd("k", "K", 40, 1.0, Char),
+    kd("l", "L", 37, 1.0, Char),
+    kd(";", ":", 41, 1.0, Char),
+    kd("'", "\"", 39, 1.0, Char),
+    kd("↵", "↵", 36, 2.25, Char),
+];
+const ROW4: [KeyDef; 12] = [
+    kd("⇧", "⇧", 56, 2.25, Shift),
+    kd("z", "Z", 6, 1.0, Char),
+    kd("x", "X", 7, 1.0, Char),
+    kd("c", "C", 8, 1.0, Char),
+    kd("v", "V", 9, 1.0, Char),
+    kd("b", "B", 11, 1.0, Char),
+    kd("n", "N", 45, 1.0, Char),
+    kd("m", "M", 46, 1.0, Char),
+    kd(",", "<", 43, 1.0, Char),
+    kd(".", ">", 47, 1.0, Char),
+    kd("/", "?", 44, 1.0, Char),
+    kd("⇧", "⇧", 60, 2.75, Shift),
+];
+const ROW5: [KeyDef; 11] = [
+    kd("🌐", "🌐", 0, 1.25, Lang),
+    kd("⌃", "⌃", 59, 1.25, Ctrl),
+    kd("⌥", "⌥", 58, 1.25, Opt),
+    kd("⌘", "⌘", 55, 1.5, Cmd),
+    kd(" ", " ", 49, 3.0, Char),
+    kd("⌘", "⌘", 54, 1.5, Cmd),
+    kd("⌥", "⌥", 61, 1.25, Opt),
+    kd("←", "←", 123, 1.0, Repeat),
+    kd("↑", "↑", 126, 1.0, Repeat),
+    kd("↓", "↓", 125, 1.0, Repeat),
+    kd("→", "→", 124, 1.0, Repeat),
+];
+
+fn kbd_rows() -> [&'static [KeyDef]; 5] {
+    [&ROW1, &ROW2, &ROW3, &ROW4, &ROW5]
+}
+
+fn key_at(idx: usize) -> Option<&'static KeyDef> {
+    kbd_rows().iter().flat_map(|r| r.iter()).nth(idx)
+}
+
+/// Cỡ bàn phím: 0 = nhỏ (phím 42pt), 1 = vừa (52pt, mặc định), 2 = lớn (62pt).
+static KBD_SIZE: AtomicU8 = AtomicU8::new(1);
+
+pub fn kbd_size() -> u8 {
+    KBD_SIZE.load(Ordering::SeqCst)
+}
+
+/// (cỡ phím, khe, lề, thanh kéo, rộng, cao) theo cỡ hiện tại. Tất cả co giãn theo cỡ phím.
+fn kbd_dims() -> (f64, f64, f64, f64, f64, f64) {
+    let ku: f64 = match kbd_size() {
+        0 => 42.0,
+        2 => 62.0,
+        _ => 52.0,
+    };
+    let kg = (ku * 0.1).round();
+    let pad = (ku * 0.25).round();
+    let handle = (ku * 0.72).round();
+    let w = 15.0 * (ku + kg) - kg + 2.0 * pad;
+    let h = handle + 8.0 + 5.0 * ku + 4.0 * kg + pad;
+    (ku, kg, pad, handle, w, h)
+}
+
+/// Đổi cỡ bàn phím: dựng lại panel (giữ vị trí); nếu đang hiện thì hiện lại với cỡ mới.
+pub fn kbd_set_size(n: u8) {
+    let n = n.min(2);
+    if n == kbd_size() && KBD_WIN.load(Ordering::SeqCst).is_null() {
+        return;
+    }
+    unsafe {
+        let was_visible = kbd_visible();
+        kbd_hide(); // nhớ vị trí hiện tại
+        KBD_SIZE.store(n, Ordering::SeqCst);
+        let win = KBD_WIN.swap(ptr::null_mut(), Ordering::SeqCst);
+        if !win.is_null() {
+            msg(win, "close");
+        }
+        for b in KBD_BTNS.iter() {
+            b.store(ptr::null_mut(), Ordering::SeqCst);
+        }
+        if was_visible {
+            with_app(|a| a.show_keyboard_now());
+        }
+    }
+}
+
+const MOD_SHIFT: u8 = 1;
+const MOD_CTRL: u8 = 2;
+const MOD_OPT: u8 = 4;
+const MOD_CMD: u8 = 8;
+const MOD_CAPS: u8 = 16;
+
+static KBD_WIN: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+static KBD_BTNS: [AtomicPtr<c_void>; 72] = [const { AtomicPtr::new(ptr::null_mut()) }; 72];
+static KBD_MODS: AtomicU8 = AtomicU8::new(0);
+/// Vị trí bàn phím lần trước (toạ độ Quartz: x, y của mép trên); nhớ giữa các lần hiện.
+static KBD_POS_SET: AtomicBool = AtomicBool::new(false);
+static KBD_POS_X: AtomicU64 = AtomicU64::new(0);
+static KBD_POS_Y: AtomicU64 = AtomicU64::new(0);
+
+fn mod_bit(k: KeyKind) -> u8 {
+    match k {
+        Shift => MOD_SHIFT,
+        Ctrl => MOD_CTRL,
+        Opt => MOD_OPT,
+        Cmd => MOD_CMD,
+        Caps => MOD_CAPS,
+        _ => 0,
+    }
+}
+
+fn mods_to_flags(m: u8) -> u64 {
+    let mut f = 0u64;
+    if m & MOD_SHIFT != 0 {
+        f |= 0x2_0000;
+    }
+    if m & MOD_CTRL != 0 {
+        f |= 0x4_0000;
+    }
+    if m & MOD_OPT != 0 {
+        f |= 0x8_0000;
+    }
+    if m & MOD_CMD != 0 {
+        f |= 0x10_0000;
+    }
+    if m & MOD_CAPS != 0 {
+        f |= 0x1_0000;
+    }
+    f
+}
+
+/// Nhãn hiển thị theo trạng thái Shift/Caps: chữ cái hoa khi Shift XOR Caps, ký hiệu đổi khi có Shift.
+fn key_label(d: &KeyDef, mods: u8) -> &'static str {
+    let shift = mods & MOD_SHIFT != 0;
+    let caps = mods & MOD_CAPS != 0;
+    let letter = d.label.len() == 1 && d.label.as_bytes()[0].is_ascii_lowercase();
+    if letter {
+        if shift ^ caps {
+            d.shift
+        } else {
+            d.label
+        }
+    } else if shift {
+        d.shift
+    } else {
+        d.label
+    }
+}
+
+unsafe fn kbd_refresh() {
+    let mods = KBD_MODS.load(Ordering::SeqCst);
+    for (i, d) in kbd_rows().iter().flat_map(|r| r.iter()).enumerate() {
+        let b = KBD_BTNS[i].load(Ordering::SeqCst);
+        if b.is_null() {
+            continue;
+        }
+        if mod_bit(d.kind) != 0 {
+            msg_int(b, "setState:", (mods & mod_bit(d.kind) != 0) as isize);
+        } else if d.kind == Lang {
+            msg_id(b, "setTitle:", ns(&format!("🌐 {}", crate::input_source::current_abbrev())));
+        } else {
+            msg_id(b, "setTitle:", ns(key_label(d, mods)));
+        }
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+unsafe fn msg_ret_rect(o: Id, s: &str) -> Rect {
+    let f: extern "C" fn(Id, Sel) -> Rect = transmute(imp());
+    f(o, sel(s))
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+unsafe fn msg_ret_rect(o: Id, s: &str) -> Rect {
+    extern "C" {
+        fn objc_msgSend_stret(ret: *mut Rect, o: Id, s: Sel);
+    }
+    let mut r = Rect { x: 0.0, y: 0.0, w: 0.0, h: 0.0 };
+    objc_msgSend_stret(&mut r, o, sel(s));
+    r
+}
+
+fn main_height() -> f64 {
+    unsafe { CGDisplayBounds(CGMainDisplayID()).size.height }
+}
+
+/// Khung cửa sổ theo toạ độ Quartz (x, y của mép trên, w, h); None nếu chưa có hoặc đang ẩn.
+unsafe fn visible_frame_q(win: Id) -> Option<(f64, f64, f64, f64)> {
+    if win.is_null() || msg_ret_int(win, "isVisible") & 0xff == 0 {
+        return None;
+    }
+    let r = msg_ret_rect(win, "frame");
+    Some((r.x, main_height() - (r.y + r.h), r.w, r.h))
+}
+
+/// Điểm (toạ độ Quartz) nằm trong cửa sổ nào của TouchRelay (bàn phím, Cài đặt, lớp phủ)?
+/// Dò Accessibility vào chính cửa sổ của mình từ luồng chính sẽ tự treo tới hết timeout nên phải bỏ qua.
+pub fn point_in_own_windows(p: P) -> bool {
+    unsafe {
+        [&KBD_WIN, &WINDOW, &CALIB_WIN].iter().any(|w| {
+            visible_frame_q(w.load(Ordering::SeqCst))
+                .is_some_and(|(x, y, ww, hh)| p.x >= x && p.x <= x + ww && p.y >= y && p.y <= y + hh)
+        })
+    }
+}
+
+/// Pid của app đang ở trên cùng.
+pub fn frontmost_pid() -> Option<i32> {
+    unsafe {
+        let app = msg(msg(class("NSWorkspace"), "sharedWorkspace"), "frontmostApplication");
+        if app.is_null() {
+            return None;
+        }
+        Some(msg_ret_int(app, "processIdentifier") as i32)
+    }
+}
+
+pub fn kbd_visible() -> bool {
+    unsafe { visible_frame_q(KBD_WIN.load(Ordering::SeqCst)).is_some() }
+}
+
+#[allow(non_snake_case)]
+unsafe fn kbd_build() -> Id {
+    let (KU, KG, KPAD, KHANDLE, KBD_W, KBD_H) = kbd_dims();
+    let win = msg(class("NSPanel"), "alloc");
+    let f: extern "C" fn(Id, Sel, Rect, usize, usize, bool) -> Id = transmute(imp());
+    let win = f(
+        win,
+        sel("initWithContentRect:styleMask:backing:defer:"),
+        Rect { x: 0.0, y: 0.0, w: KBD_W, h: KBD_H },
+        1 << 7, // NSWindowStyleMaskNonactivatingPanel: bấm phím không cướp focus của app đang gõ
+        2,
+        false,
+    );
+    msg_bool(win, "setReleasedWhenClosed:", false);
+    msg_bool(win, "setFloatingPanel:", true);
+    msg_bool(win, "setBecomesKeyOnlyIfNeeded:", true);
+    msg_bool(win, "setHidesOnDeactivate:", false);
+    msg_bool(win, "setMovableByWindowBackground:", true);
+    msg_bool(win, "setOpaque:", false);
+    msg_id(win, "setBackgroundColor:", color("clearColor"));
+    msg_bool(win, "setHasShadow:", true);
+    msg_int(win, "setLevel:", 25); // NSStatusWindowLevel: trên cửa sổ thường
+    msg_int(win, "setCollectionBehavior:", 1 | 256); // mọi Space + cạnh app toàn màn hình
+
+    let ve = msg_rect(msg(class("NSVisualEffectView"), "alloc"), "initWithFrame:", Rect { x: 0.0, y: 0.0, w: KBD_W, h: KBD_H });
+    msg_int(ve, "setMaterial:", 13); // HUD window
+    msg_int(ve, "setBlendingMode:", 0);
+    msg_int(ve, "setState:", 1);
+    msg_bool(ve, "setWantsLayer:", true);
+    let layer = msg(ve, "layer");
+    if !layer.is_null() {
+        msg_f64(layer, "setCornerRadius:", 14.0);
+        msg_bool(layer, "setMasksToBounds:", true);
+    }
+    msg_id(win, "setContentView:", ve);
+
+    let target = TARGET.load(Ordering::SeqCst);
+    // Thanh kéo: chấm tròn ở giữa + nút đóng bên phải.
+    label_center(ve, "•••", KBD_W / 2.0, KBD_W, KBD_H - KHANDLE + 4.0, 14.0, false, true);
+    let close = msg_rect(msg(class("NSButton"), "alloc"), "initWithFrame:", Rect { x: KBD_W - 38.0, y: KBD_H - KHANDLE + 1.0, w: 30.0, h: 24.0 });
+    msg_id(close, "setTitle:", ns("✕"));
+    msg_bool(close, "setBordered:", false);
+    msg_id(close, "setFont:", font(14.0, false));
+    msg_id(close, "setTarget:", target);
+    msg_sel(close, "setAction:", "kbdClose:");
+    msg_id(ve, "addSubview:", close);
+
+    let mut idx = 0usize;
+    for (r, row) in kbd_rows().iter().enumerate() {
+        let y = KBD_H - KHANDLE - 8.0 - (r as f64 + 1.0) * KU - r as f64 * KG;
+        let mut x = KPAD;
+        for d in row.iter() {
+            let w = d.w * (KU + KG) - KG;
+            let b = msg_rect(msg(class("NSButton"), "alloc"), "initWithFrame:", Rect { x, y, w, h: KU });
+            msg_id(b, "setTitle:", ns(d.label));
+            msg_int(b, "setBezelStyle:", 2); // flexible push: giữ đúng chiều cao phím
+            msg_id(b, "setFont:", font((if d.label.chars().count() > 1 || !d.label.is_ascii() { 17.0 } else { 16.0 }) * KU / 42.0, false));
+            if mod_bit(d.kind) != 0 {
+                msg_int(b, "setButtonType:", 1); // push on / push off: giữ trạng thái bật
+            }
+            if d.kind == Repeat {
+                msg_bool(b, "setContinuous:", true);
+                let cell = msg(b, "cell");
+                let f: extern "C" fn(Id, Sel, f32, f32) = transmute(imp());
+                f(cell, sel("setPeriodicDelay:interval:"), 0.4, 0.06);
+            }
+            msg_id(b, "setTarget:", target);
+            msg_sel(b, "setAction:", "kbdKey:");
+            msg_int(b, "setTag:", idx as isize);
+            msg_id(ve, "addSubview:", b);
+            if idx < KBD_BTNS.len() {
+                KBD_BTNS[idx].store(b, Ordering::SeqCst);
+            }
+            idx += 1;
+            x += d.w * (KU + KG);
+        }
+    }
+    msg(win, "retain");
+    win
+}
+
+/// Hiện bàn phím trên màn hình đích. `bounds` = khung màn hình (Quartz), `avoid` = khung ô nhập đang focus:
+/// nếu bàn phím che mất ô nhập thì đổi sang nửa màn hình bên kia.
+#[allow(non_snake_case)]
+pub fn kbd_show(bounds: (f64, f64, f64, f64), main_h: f64, avoid: Option<(f64, f64, f64, f64)>) {
+    let (_KU, _KG, _KPAD, _KHANDLE, KBD_W, KBD_H) = kbd_dims();
+    unsafe {
+        let mut win = KBD_WIN.load(Ordering::SeqCst);
+        if win.is_null() {
+            win = kbd_build();
+            KBD_WIN.store(win, Ordering::SeqCst);
+        }
+        let (bx, by, bw, bh) = bounds;
+        let (mut x, mut yq) = if KBD_POS_SET.load(Ordering::SeqCst) {
+            (f64::from_bits(KBD_POS_X.load(Ordering::SeqCst)), f64::from_bits(KBD_POS_Y.load(Ordering::SeqCst)))
+        } else {
+            (bx + (bw - KBD_W) / 2.0, by + bh - KBD_H - 90.0)
+        };
+        x = x.clamp(bx, (bx + bw - KBD_W).max(bx));
+        yq = yq.clamp(by + 30.0, (by + bh - KBD_H).max(by + 30.0));
+        if let Some((ax, ay, aw, ah)) = avoid {
+            let overlap = ax < x + KBD_W && ax + aw > x && ay < yq + KBD_H && ay + ah > yq;
+            if overlap {
+                yq = if yq + KBD_H / 2.0 > by + bh / 2.0 { by + 40.0 } else { by + bh - KBD_H - 90.0 };
+            }
+        }
+        msg_point(win, "setFrameOrigin:", Point { x, y: main_h - (yq + KBD_H) });
+        KBD_MODS.store(0, Ordering::SeqCst);
+        kbd_refresh();
+        msg(win, "orderFrontRegardless");
+    }
+}
+
+pub fn kbd_hide() {
+    unsafe {
+        let win = KBD_WIN.load(Ordering::SeqCst);
+        if let Some((x, y, _, _)) = visible_frame_q(win) {
+            KBD_POS_X.store(x.to_bits(), Ordering::SeqCst); // nhớ chỗ người dùng đã kéo tới
+            KBD_POS_Y.store(y.to_bits(), Ordering::SeqCst);
+            KBD_POS_SET.store(true, Ordering::SeqCst);
+            msg_id(win, "orderOut:", NIL);
+        }
+        KBD_MODS.store(0, Ordering::SeqCst);
+    }
+}
+
+unsafe fn msg_point(o: Id, s: &str, p: Point) -> Id {
+    let f: extern "C" fn(Id, Sel, Point) -> Id = transmute(imp());
+    f(o, sel(s), p)
+}
+
+extern "C" fn on_kbd_key(_this: Id, _cmd: Sel, sender: Id) {
+    unsafe {
+        let Some(d) = key_at(tag_of(sender) as usize) else { return };
+        if d.kind == Lang {
+            crate::input_source::switch_next();
+            kbd_refresh(); // cập nhật mã ngôn ngữ trên phím
+            return;
+        }
+        let mut mods = KBD_MODS.load(Ordering::SeqCst);
+        let bit = mod_bit(d.kind);
+        if bit != 0 {
+            // Phím bổ trợ: bật/tắt theo trạng thái nút; Shift/Ctrl/Opt/Cmd chỉ dính cho phím kế tiếp, Caps giữ.
+            if msg_ret_int(sender, "state") == 1 {
+                mods |= bit;
+            } else {
+                mods &= !bit;
+            }
+            KBD_MODS.store(mods, Ordering::SeqCst);
+            kbd_refresh();
+            return;
+        }
+        let mut flags = mods_to_flags(mods);
+        if (123..=126).contains(&d.code) {
+            flags |= 0x80_0000 | 0x20_0000; // phím mũi tên mang cờ Fn + NumericPad như bàn phím thật
+        }
+        crate::macos::post_key(d.code, flags);
+        KBD_MODS.store(mods & MOD_CAPS, Ordering::SeqCst);
+        kbd_refresh();
+    }
+}
+
+extern "C" fn on_pop_kbd_size(_this: Id, _cmd: Sel, sender: Id) {
+    kbd_set_size(unsafe { msg_ret_int(sender, "indexOfSelectedItem") } as u8);
+    save_prefs();
+}
+
+/// Đổi ngôn ngữ giao diện ngay: menu dựng lại ở lần mở kế tiếp, cửa sổ Cài đặt dựng lại tại chỗ.
+fn set_language(mode: u8) {
+    LANG_MODE.store(mode.min(2), Ordering::SeqCst);
+    refresh_lang();
+    unsafe {
+        let table = TABLE.load(Ordering::SeqCst);
+        if !table.is_null() {
+            msg(table, "reloadData"); // tên các trang ở sidebar
+            let idx = msg_int(class("NSIndexSet"), "indexSetWithIndex:", SELECTED.load(Ordering::SeqCst) as isize);
+            let g: extern "C" fn(Id, Sel, Id, bool) = transmute(imp());
+            g(table, sel("selectRowIndexes:byExtendingSelection:"), idx, false); // dựng lại trang đang mở
+        }
+    }
+}
+
+extern "C" fn on_set_language(_this: Id, _cmd: Sel, sender: Id) {
+    let idx = unsafe { tag_of(sender) } as u8;
+    unsafe { set_radio(msg(sender, "menu"), idx as usize) };
+    set_language(idx);
+    save_prefs();
+}
+
+extern "C" fn on_pop_lang(_this: Id, _cmd: Sel, sender: Id) {
+    set_language(unsafe { msg_ret_int(sender, "indexOfSelectedItem") } as u8);
+    save_prefs();
+}
+
+extern "C" fn on_set_kbd_size(_this: Id, _cmd: Sel, sender: Id) {
+    let idx = unsafe { tag_of(sender) } as u8;
+    unsafe { set_radio(msg(sender, "menu"), idx as usize) };
+    kbd_set_size(idx);
+    save_prefs();
+}
+
+extern "C" fn on_set_swipe(_this: Id, _cmd: Sel, sender: Id) {
+    let idx = unsafe { tag_of(sender) } as u8;
+    unsafe { set_radio(msg(sender, "menu"), idx as usize) };
+    with_app(|a| a.set_swipe_level(idx));
+    save_prefs();
+}
+
+extern "C" fn on_pop_swipe(_this: Id, _cmd: Sel, sender: Id) {
+    let n = unsafe { msg_ret_int(sender, "indexOfSelectedItem") } as u8;
+    with_app(|a| a.set_swipe_level(n));
+    save_prefs();
+}
+
+extern "C" fn on_kbd_close(_this: Id, _cmd: Sel, _sender: Id) {
+    kbd_hide();
+    with_app(|a| a.kbd_dismissed_by_user());
+}
+
+extern "C" fn on_show_keyboard(_this: Id, _cmd: Sel, _sender: Id) {
+    with_app(|a| a.show_keyboard_now());
+}
+
 unsafe fn target_class() -> Id {
     let existing = class("TouchRelayMenuTarget");
     if !existing.is_null() {
@@ -1346,7 +2071,7 @@ unsafe fn target_class() -> Id {
     let name = CString::new("TouchRelayMenuTarget").unwrap();
     let cls = objc_allocateClassPair(class("NSObject"), name.as_ptr(), 0);
     let types = CString::new("v@:@").unwrap();
-    let handlers: [(&str, extern "C" fn(Id, Sel, Id)); 24] = [
+    let handlers: [(&str, extern "C" fn(Id, Sel, Id)); 35] = [
         ("toggleItem:", on_toggle),
         ("setSpeed:", on_set_speed),
         ("setOrientation:", on_set_orientation),
@@ -1368,6 +2093,17 @@ unsafe fn target_class() -> Id {
         ("resetCalib:", on_reset_calib),
         ("startTouchTest:", on_start_touch_test),
         ("startScreenTest:", on_start_screen_test),
+        ("kbdKey:", on_kbd_key),
+        ("kbdClose:", on_kbd_close),
+        ("popKbdSize:", on_pop_kbd_size),
+        ("popSwipe:", on_pop_swipe),
+        ("debugSnapshot:", on_debug_snapshot),
+        ("settingsScrolled:", on_settings_scrolled),
+        ("setKbdSize:", on_set_kbd_size),
+        ("setSwipe:", on_set_swipe),
+        ("setLanguage:", on_set_language),
+        ("popLang:", on_pop_lang),
+        ("showKeyboard:", on_show_keyboard),
         ("winDisplay:", on_win_display),
         ("winClose:", on_win_close),
         ("quit:", on_quit),
@@ -1440,6 +2176,7 @@ unsafe fn toggle_item(menu: Id, target: Id, tag: isize, title: &str, key: &str) 
 
 /// Dựng nội dung menu chính (gọi lúc khởi tạo và khi ngôn ngữ hệ thống đổi).
 unsafe fn build_menu(menu: Id, target: Id) {
+    MENU_BUILT_VI.store(is_vi(), Ordering::SeqCst);
     let status = add_item(menu, target, &tr("●  Đang hoạt động"), None, "", None);
     msg(status, "retain");
     STATUS_ITEM.store(status, Ordering::SeqCst);
@@ -1448,28 +2185,37 @@ unsafe fn build_menu(menu: Id, target: Id) {
     DEVICE_ITEM.store(dev, Ordering::SeqCst);
     set_devices(&[]);
     separator(menu);
-    // Việc hay dùng ở cấp trên cùng.
+    // 1) Công tắc hay dùng nhất, ở cấp trên cùng.
     toggle_item(menu, target, T_PAUSE, "Tạm dừng", "p");
     toggle_item(menu, target, T_SNAP, "Chạm thông minh", "");
     toggle_item(menu, target, T_HIDE, "Ẩn con trỏ khi chạm", "");
     separator(menu);
 
-    // Nhóm cài đặt dùng thường xuyên, gom vào submenu.
-    let speed_labels: Vec<&str> = SPEEDS.iter().map(|s| s.0).collect();
-    radio_menu(menu, target, "Tốc độ cuộn", &speed_labels, "setSpeed:", &SPEED_MENU);
-    let sub = add_submenu(menu, target, &tr("Cuộn & cử chỉ"));
-    toggle_item(sub, target, T_INVERT, "Đảo chiều cuộn", "");
-    toggle_item(sub, target, T_MOMENTUM, "Cuộn quán tính", "");
-    toggle_item(sub, target, T_PINCH, "Chụm / xoè để phóng to", "");
-    toggle_item(sub, target, T_SWIPE, "Vuốt 3 ngón", "");
-    toggle_item(sub, target, T_ONEFINGER, "Kéo 1 ngón để cuộn (kiểu iPad)", "");
-    let sub = add_submenu(menu, target, &tr("Màn hình"));
-    let disp = add_submenu(sub, target, &tr("Màn hình đích"));
-    DISPLAY_MENU.store(disp, Ordering::SeqCst);
-    radio_menu(sub, target, "Hướng màn hình", &ORIENTS, "setOrientation:", &ORIENT_MENU);
-    radio_menu(sub, target, "Cỡ giao diện", &SCALES, "setScale:", &SCALE_MENU);
+    // 2) Nhóm theo mục đích: bàn phím, cuộn & cử chỉ, màn hình, công cụ.
+    let kbd = add_submenu(menu, target, &tr("Bàn phím ảo"));
+    toggle_item(kbd, target, T_KEYBOARD, "Tự hiện khi chạm vào ô nhập", "");
+    add_item(kbd, target, &tr("Hiện bàn phím ảo"), Some("showKeyboard:"), "", None);
+    separator(kbd);
+    radio_menu(kbd, target, "Cỡ bàn phím", &["Nhỏ", "Vừa (mặc định)", "Lớn"], "setKbdSize:", &KBD_SIZE_MENU);
 
-    // Công cụ: hiệu chỉnh, kiểm tra, trợ giúp, nâng cao.
+    let gest = add_submenu(menu, target, &tr("Cuộn & cử chỉ"));
+    let speed_labels: Vec<&str> = SPEEDS.iter().map(|s| s.0).collect();
+    radio_menu(gest, target, "Tốc độ cuộn", &speed_labels, "setSpeed:", &SPEED_MENU);
+    toggle_item(gest, target, T_INVERT, "Đảo chiều cuộn", "");
+    toggle_item(gest, target, T_MOMENTUM, "Cuộn quán tính", "");
+    separator(gest);
+    toggle_item(gest, target, T_ONEFINGER, "Kéo 1 ngón để cuộn (kiểu iPad)", "");
+    toggle_item(gest, target, T_SMARTDRAG, "Kéo thông minh", "");
+    toggle_item(gest, target, T_PINCH, "Chụm / xoè để phóng to", "");
+    toggle_item(gest, target, T_SWIPE, "Vuốt 3 ngón", "");
+    radio_menu(gest, target, "Độ nhạy vuốt nhiều ngón", &["Nhạy", "Vừa (mặc định)", "Khó (vuốt xa hơn)"], "setSwipe:", &SWIPE_MENU);
+
+    let disp_menu = add_submenu(menu, target, &tr("Màn hình"));
+    let disp = add_submenu(disp_menu, target, &tr("Màn hình đích"));
+    DISPLAY_MENU.store(disp, Ordering::SeqCst);
+    radio_menu(disp_menu, target, "Hướng màn hình", &ORIENTS, "setOrientation:", &ORIENT_MENU);
+    radio_menu(disp_menu, target, "Cỡ giao diện", &SCALES, "setScale:", &SCALE_MENU);
+
     let tools = add_submenu(menu, target, &tr("Công cụ"));
     add_item(tools, target, &tr("Hiệu chỉnh vị trí chạm…"), Some("startCalib:"), "", None);
     add_item(tools, target, &tr("Kiểm tra vùng chạm…"), Some("startTouchTest:"), "", None);
@@ -1482,7 +2228,9 @@ unsafe fn build_menu(menu: Id, target: Id) {
     add_item(tools, target, &tr("Xem nhật ký"), Some("openLog:"), "", None);
     separator(menu);
 
+    // 3) Ứng dụng: cài đặt, ngôn ngữ, khởi động cùng macOS, giới thiệu, thoát.
     add_item(menu, target, &tr("Cài đặt…"), Some("openSettings:"), ",", None);
+    radio_menu(menu, target, "Ngôn ngữ", &["Theo hệ thống", "English", "Tiếng Việt"], "setLanguage:", &LANG_MENU);
     if !class("SMAppService").is_null() {
         toggle_item(menu, target, T_LOGIN, "Mở cùng macOS", "");
     }

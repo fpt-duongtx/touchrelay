@@ -159,6 +159,19 @@ unsafe fn post(e: CGEventRef) {
     }
 }
 
+/// Phát một phím (nhấn rồi nhả) với cờ bổ trợ, như bàn phím vật lý. Dùng mã phím nên bộ gõ hệ thống (Telex/VNI...) hoạt động.
+pub(crate) fn post_key(code: u16, flags: u64) {
+    unsafe {
+        for down in [true, false] {
+            let e = CGEventCreateKeyboardEvent(ptr::null(), code, down);
+            if !e.is_null() {
+                CGEventSetFlags(e, flags);
+            }
+            post(e);
+        }
+    }
+}
+
 unsafe fn mouse(t: u32, at: P, button: u32, clicks: i64) {
     let e = CGEventCreateMouseEvent(ptr::null(), t, pt(at), button);
     if !e.is_null() && clicks > 0 {
@@ -353,6 +366,7 @@ impl Sink {
                         gesture(kIOHIDEventTypeGestureEnded, 0, None, at);
                     }
                 },
+                Action::ToggleKeyboard => {} // do App xử lý (cần trạng thái bàn phím), không phải Sink
                 Action::CtrlKey(k) => {
                     let code: u16 = match k {
                         Key::Left => 123,
@@ -392,6 +406,12 @@ pub(crate) struct App {
     scale: crate::display::ScaleState,
     pub(crate) scale_level: usize,
     snap: bool,
+    /// Bàn phím ảo: bật tự hiện, đã bị người dùng đóng tay (chờ tới khi rời ô nhập mới tự hiện lại),
+    /// và lịch kiểm tra ô nhập sau một cú chạm (thời điểm, vị trí chạm).
+    keyboard: bool,
+    swipe_level: u8,
+    kbd_dismissed: bool,
+    kbd_check: Option<(f64, P)>,
     probe: Option<Probe>,
     calib_run: Option<CalibRun>,
     /// Thời điểm tự đóng lớp phủ hiệu chỉnh (đang hiện thông báo kết quả).
@@ -510,7 +530,7 @@ impl App {
         let (bounds, main_h) = self.overlay_geometry();
         match &probe {
             Probe::Touch(_) => menubar::overlay_touch_ui(bounds, main_h),
-            Probe::Colors { .. } => menubar::overlay_message(bounds, main_h, &tr("Chạm để đổi màu · chạm 4 ngón để thoát")),
+            Probe::Colors { .. } => menubar::overlay_message(bounds, main_h, &tr("Chạm để đổi màu · chạm 3 ngón để thoát")),
         }
         self.probe = Some(probe);
     }
@@ -564,7 +584,7 @@ impl App {
 
     /// Nhận một frame cảm ứng khi đang chạy công cụ kiểm tra.
     fn probe_frame(&mut self, tips: &[(u32, f64, f64)]) {
-        if tips.len() >= 4 {
+        if tips.len() >= 3 {
             self.stop_probe();
             return;
         }
@@ -710,6 +730,11 @@ impl App {
             display: self.display,
             hide_cursor: self.sink.hide_cursor,
             snap: self.snap,
+            smart_drag: crate::snap::smart_drag_enabled(),
+            keyboard: self.keyboard,
+            kbd_size: menubar::kbd_size(),
+            swipe_level: self.swipe_level,
+            language: menubar::language_mode(),
             calib: self.map.calib_base.as_ref().map(|c| c.to_vec()),
             extent: self.map.extent.map(|e| e.to_vec()),
             calib_size: self.map.calib_size,
@@ -758,7 +783,10 @@ impl App {
                 if let Some(b) = target_bounds(self.display) {
                     self.map.bounds = b;
             self.map.refresh_calib();
+            self.sync_swipe();
                     self.map.refresh_calib();
+            self.sync_swipe();
+                    self.sync_swipe();
                 }
                 String::new()
             }
@@ -771,11 +799,110 @@ impl App {
         if let Some(b) = target_bounds(d) {
             self.map.bounds = b;
             self.map.refresh_calib();
+            self.sync_swipe();
         }
     }
 
     pub(crate) fn display_choice(&self) -> Option<usize> {
         self.display
+    }
+
+    /// Quãng vuốt nhiều ngón theo kích thước màn hình đích và độ nhạy: 7% / 12% / 18% chiều rộng (ngang)
+    /// và chiều cao (dọc). Màn hình 2560 rộng: ~180 / ~307 / ~460 điểm.
+    pub(crate) fn sync_swipe(&mut self) {
+        let f = [0.07, 0.12, 0.18][self.swipe_level.min(2) as usize];
+        let b = self.map.bounds;
+        self.engine.cfg.swipe_distance_x = b.size.width * f;
+        self.engine.cfg.swipe_distance_y = b.size.height * f;
+    }
+
+    pub(crate) fn set_swipe_level(&mut self, level: u8) {
+        self.swipe_level = level.min(2);
+        self.sync_swipe();
+    }
+
+    pub(crate) fn toggle_keyboard(&mut self) -> bool {
+        self.keyboard = !self.keyboard;
+        if !self.keyboard {
+            menubar::kbd_hide();
+        }
+        self.keyboard
+    }
+
+    /// Đưa một hành động của engine tới nơi xử lý: ToggleKeyboard là việc của App (cần trạng thái bàn phím),
+    /// còn lại tới Sink. Phải dùng cho MỌI đường phát ra hành động (frame cảm ứng và timer `tick`):
+    /// cử chỉ giữ 3 ngón do `tick` sinh ra, nếu đưa thẳng vào Sink sẽ bị bỏ rơi.
+    pub(crate) fn dispatch(&mut self, a: Action) {
+        if a == Action::ToggleKeyboard {
+            if self.debug {
+                eprintln!("  -> ToggleKeyboard (cử chỉ 3 ngón), bàn phím đang hiện: {}", menubar::kbd_visible());
+            }
+            self.toggle_keyboard_by_gesture();
+        } else {
+            self.sink.apply(&a);
+        }
+    }
+
+    /// Chạm 2 lần bằng 3 ngón: đang hiện thì ẩn (và không tự hiện lại tới khi rời ô nhập), đang ẩn thì hiện.
+    fn toggle_keyboard_by_gesture(&mut self) {
+        if !self.keyboard {
+            return;
+        }
+        if menubar::kbd_visible() {
+            menubar::kbd_hide();
+            self.kbd_dismissed = true;
+        } else {
+            self.show_keyboard_now();
+        }
+    }
+
+    /// Người dùng đóng bàn phím bằng nút ✕: không tự hiện lại cho tới khi focus rời khỏi ô nhập.
+    pub(crate) fn kbd_dismissed_by_user(&mut self) {
+        self.kbd_dismissed = true;
+    }
+
+    /// Hiện bàn phím ngay (từ menu), bất kể có đang focus ô nhập hay không.
+    pub(crate) fn show_keyboard_now(&mut self) {
+        self.kbd_dismissed = false;
+        let (bounds, main_h) = self.overlay_geometry();
+        menubar::kbd_show(bounds, main_h, None);
+    }
+
+    /// Sau một cú chạm: nếu đang focus vào ô nhập thì hiện bàn phím, rời ô nhập thì ẩn.
+    fn kbd_tick(&mut self, now: f64) {
+        let Some((at, tap)) = self.kbd_check else { return };
+        if now < at {
+            return;
+        }
+        self.kbd_check = None;
+        // Chạm vào chính bàn phím: giữ nguyên, đừng dò (tránh treo AX vào cửa sổ của mình).
+        if menubar::point_in_own_windows(tap) {
+            return;
+        }
+        let pid = menubar::frontmost_pid();
+        let focus = if pid == Some(std::process::id() as i32) { None } else { crate::snap::focus_info(pid) };
+        match focus {
+            Some(f) if f.is_text => {
+                if self.keyboard && !self.kbd_dismissed && !menubar::kbd_visible() {
+                    let (bounds, main_h) = self.overlay_geometry();
+                    let avoid = f.frame.map(|(p, s)| (p.x, p.y, s.x, s.y));
+                    menubar::kbd_show(bounds, main_h, avoid);
+                }
+            }
+            Some(_) => {
+                self.kbd_dismissed = false;
+                if menubar::kbd_visible() {
+                    menubar::kbd_hide();
+                }
+            }
+            None => {}
+        }
+    }
+
+    pub(crate) fn toggle_smart_drag(&mut self) -> bool {
+        let on = !crate::snap::smart_drag_enabled();
+        crate::snap::set_smart_drag(on);
+        on
     }
 
     pub(crate) fn toggle_snap(&mut self) -> bool {
@@ -913,7 +1040,7 @@ extern "C" fn on_report(
             .iter()
             .map(|t| format!("#{}({:.0},{:.0})", t.id, t.p.x, t.p.y))
             .collect();
-        eprintln!("[{}] frame: {}", d.name, s.join(" "));
+        eprintln!("[{}] t={:.3} frame: {}", d.name, now, s.join(" "));
     }
     if !touches.is_empty() {
         app.sink.last_touch_t = now;
@@ -928,6 +1055,10 @@ extern "C" fn on_report(
     if app.snap {
         // Chạm thông minh: tap trượt nút nhỏ thì hút vào điều khiển gần nhất (vòng dò bán kính 20pt).
         for (i, p) in crate::snap::find_tap_clicks(&acts) {
+            // Điểm nằm trong cửa sổ của chính TouchRelay (bàn phím, Cài đặt): dò AX sẽ tự treo tới hết timeout.
+            if menubar::point_in_own_windows(p) {
+                continue;
+            }
             let q = crate::snap::snap_point(p, 20.0);
             if q.dist(p) > 0.5 {
                 if app.debug {
@@ -937,8 +1068,13 @@ extern "C" fn on_report(
             }
         }
     }
+    if app.keyboard {
+        if let Some((_, q)) = crate::snap::find_tap_clicks(&acts).first() {
+            app.kbd_check = Some((now + 0.2, *q));
+        }
+    }
     for a in acts {
-        app.sink.apply(&a);
+        app.dispatch(a);
     }
 }
 
@@ -975,7 +1111,10 @@ extern "C" fn on_timer(_t: CFRunLoopTimerRef, info: *mut c_void) {
             {
                 app.map.bounds = b;
             app.map.refresh_calib();
+            app.sync_swipe();
                 app.map.refresh_calib();
+            app.sync_swipe();
+                app.sync_swipe();
                 if app.ui {
                     menubar::rebuild_displays();
                 }
@@ -987,12 +1126,13 @@ extern "C" fn on_timer(_t: CFRunLoopTimerRef, info: *mut c_void) {
         }
     }
     let now = unsafe { CFAbsoluteTimeGetCurrent() };
+    app.kbd_tick(now);
     app.calib_tick(now);
     app.probe_tick(now);
     app.sink.pump(now);
     app.sink.check_real_pointer(now);
     for a in app.engine.tick(now) {
-        app.sink.apply(&a);
+        app.dispatch(a);
     }
 }
 
@@ -1291,6 +1431,7 @@ extern "C" fn on_touch_added(ctx: *mut c_void, _r: IOReturn, _s: *mut c_void, de
         if let Some(b) = target_bounds(app.display) {
             app.map.bounds = b;
             app.map.refresh_calib();
+            app.sync_swipe();
             eprintln!(
                 "Màn hình đích: {}x{} tại ({}, {})",
                 b.size.width, b.size.height, b.origin.x, b.origin.y
@@ -1384,6 +1525,7 @@ pub fn run(opts: Options) -> i32 {
         }
         1
     };
+    menubar::set_language_mode(opts.language); // trước mọi hộp thoại, kể cả thông báo thiếu quyền
     if ui {
         menubar::init_app();
     }
@@ -1460,12 +1602,28 @@ pub fn run(opts: Options) -> i32 {
             scale: crate::display::ScaleState::new(),
             scale_level: 0,
             snap: opts.snap,
+            keyboard: opts.keyboard,
+            swipe_level: opts.swipe_level,
+            kbd_dismissed: false,
+            kbd_check: None,
             probe: None,
             calib_run: None,
             overlay_until: None,
         }));
         APP_PTR.store(app, Ordering::SeqCst);
+        crate::snap::set_smart_drag(opts.smart_drag);
+        menubar::kbd_set_size(opts.kbd_size);
+        (*app).engine.intent_probe = Some(Box::new(|p| {
+            if !crate::snap::smart_drag_enabled() {
+                None
+            } else if menubar::point_in_own_windows(p) {
+                Some(true) // kéo cửa sổ của mình (thanh kéo bàn phím...), không dò AX
+            } else {
+                crate::snap::drag_intent(p)
+            }
+        }));
         (*app).map.refresh_calib();
+        (*app).sync_swipe();
 
         // ---- Theo dõi thiết bị cảm ứng (hỗ trợ cắm/rút nóng) ----
         // Dùng common modes để vẫn nhận cảm ứng khi đang mở menu.
@@ -1508,8 +1666,18 @@ pub fn run(opts: Options) -> i32 {
 
         if ui {
             menubar::install(&with_app(|a| a.prefs()));
+            menubar::set_debug_ui(opts.debug);
             if opts.open_settings {
                 menubar::open_settings();
+                if let Some(n) = opts.settings_page {
+                    menubar::select_page(n);
+                }
+                if let Some(path) = &opts.snapshot {
+                    menubar::schedule_snapshot(path, 0.8);
+                }
+            }
+            if opts.show_keyboard {
+                with_app(|a| a.show_keyboard_now());
             }
             eprintln!("Đang chạy (menu bar).");
             menubar::run_app();

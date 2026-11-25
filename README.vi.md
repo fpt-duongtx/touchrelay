@@ -8,22 +8,32 @@ Viết bằng Rust thuần, **không có dependency**: IOKit, CoreFoundation, Co
 
 > **Không chính thức, chưa ký/notarize.** Không liên kết với Apple hay hãng màn hình nào. Hãy đọc [miễn trừ trách nhiệm](DISCLAIMER.md) trước khi dùng.
 
+## Ảnh chụp
+
+| | | |
+|---|---|---|
+| ![Menu](docs/img/menu-sm.jpg) | ![Chung](docs/img/general-sm.png) | ![Cuộn và cử chỉ](docs/img/scrolling-sm.png) |
+| ![Bàn phím ảo](docs/img/keyboard-sm.png) | ![Màn hình](docs/img/display-sm.png) | ![Công cụ](docs/img/tools-sm.png) |
+
 ## Cử chỉ
 
 | Trên màn hình cảm ứng | Kết quả trên macOS |
 |---|---|
 | Chạm 1 ngón | Click trái (chạm nhanh 2 lần = double-click) |
-| Kéo 1 ngón | Cuộn kiểu iPad (có thể đổi thành kéo chuột) |
-| Giữ yên ~0.3s rồi kéo | Kéo chuột: thanh trượt, chọn chữ, kéo cửa sổ/file |
+| Kéo 1 ngón | **Thông minh:** kéo chuột khi chạm thanh trượt, thanh cuộn, thanh tiêu đề cửa sổ, ô nhập một dòng; cuộn khi chạm nội dung cuộn được (trang web, danh sách) |
+| Giữ yên ~0.3s rồi kéo | Kéo chuột ở mọi nơi: chọn chữ, kéo file, kéo cửa sổ |
 | Kéo 2 ngón | Cuộn mượt theo pixel có **quán tính** |
 | Chạm 2 ngón | Click phải |
 | Chụm / xoè | Zoom (Safari, Preview, Maps…) |
 | Vuốt 3 ngón trái / phải | Chuyển Space hoặc app full-screen |
 | Vuốt 3 ngón lên / xuống | Mission Control / App Exposé |
+| Chạm 2 lần bằng 3 ngón, hoặc giữ yên 3 ngón 3 giây | Hiện / ẩn bàn phím ảo |
 | Chạm khi đang trượt quán tính | Dừng cuộn ngay |
 
 ## Tính năng
 
+- **Kéo thông minh**: kéo 1 ngón tự chọn kéo chuột hay cuộn theo thứ nằm dưới ngón tay (qua Accessibility), nên hiếm khi phải giữ yên 0.3s.
+- **Bàn phím ảo**: bàn phím nổi gọn (bố cục như bàn phím vật lý, không hàng F; ba cỡ) tự hiện khi chạm vào ô nhập. Kéo thanh trên cùng để di chuyển; chạm 2 lần bằng 3 ngón để hiện/ẩn thủ công. Phím gửi mã phím thật nên bộ gõ Telex/VNI vẫn dùng được, và có phím 🌐 để đổi ngôn ngữ nhập (hiện mã ngôn ngữ hiện tại, ví dụ EN hoặc VI).
 - **Cắm/rút nóng**: cắm hoặc rút màn hình lúc nào cũng được.
 - **Chạm thông minh**: nếu chạm trượt một nút nhỏ, TouchRelay dùng Accessibility để chọn điều khiển gần nhất trong vòng ~20 điểm.
 - **Hiệu chỉnh vị trí chạm**: chạm 9 dấu để sửa cảm biến không tuyến tính ở gần mép (màn hình dùng để phát triển bị như vậy).
@@ -31,7 +41,7 @@ Viết bằng Rust thuần, **không có dependency**: IOKit, CoreFoundation, Co
 - **Kiểm tra màn hình**: các màu đặc để tìm điểm ảnh chết.
 - **Cỡ giao diện**: tạm phóng to giao diện trên màn hình cảm ứng (đa số tấm nền chỉ mức 2× là sắc nét).
 - **Ẩn con trỏ** khi dùng cảm ứng, hiện lại khi bạn dùng chuột/trackpad.
-- Cửa sổ Cài đặt native (sidebar + nhóm form), giao diện tiếng Việt/Anh theo ngôn ngữ hệ thống.
+- Cửa sổ Cài đặt native (sidebar + nhóm form), giao diện tiếng Việt/Anh mặc định theo ngôn ngữ hệ thống; có thể chọn ngôn ngữ riêng trong Cài đặt hoặc menu (Ngôn ngữ ▸).
 
 ## Phần cứng đã thử
 
@@ -106,18 +116,22 @@ Bật cả hai cho TouchRelay rồi mở lại. Nếu app có trong danh sách m
 
 ## Cách dùng
 
-TouchRelay nằm trên thanh menu (icon ☝︎, không có icon Dock). Các công tắc hay dùng ở cấp trên cùng, phần còn lại được gom nhóm:
+TouchRelay nằm trên thanh menu (icon ☝︎, không có icon Dock). Menu được gom theo mục đích:
 
-- **Tạm dừng**, **Chạm thông minh**, **Ẩn con trỏ khi chạm**
-- **Tốc độ cuộn ▸**, **Cuộn & cử chỉ ▸**, **Màn hình ▸** (màn hình đích, hướng, cỡ giao diện)
-- **Công cụ ▸**: hiệu chỉnh, kiểm tra vùng chạm, kiểm tra màn hình, hướng dẫn cử chỉ, khắc phục sự cố, tuỳ chọn dòng lệnh, nhật ký
-- **Cài đặt…** (⌘,), Mở cùng macOS, Giới thiệu, Thoát
+- **Công tắc nhanh:** Tạm dừng, Chạm thông minh, Ẩn con trỏ khi chạm
+- **Bàn phím ảo ▸:** tự hiện, hiện ngay, cỡ bàn phím
+- **Cuộn & cử chỉ ▸:** tốc độ cuộn, đảo chiều, quán tính, kéo 1 ngón để cuộn, kéo thông minh, chụm zoom, vuốt 3 ngón, độ nhạy vuốt
+- **Màn hình ▸:** màn hình đích, hướng, cỡ giao diện
+- **Công cụ ▸:** hiệu chỉnh, kiểm tra vùng chạm, kiểm tra màn hình, hướng dẫn cử chỉ, khắc phục sự cố, tuỳ chọn dòng lệnh, nhật ký
+- **Ứng dụng:** Cài đặt… (⌘,), Ngôn ngữ ▸, Mở cùng macOS, Giới thiệu, Thoát
+
+Cửa sổ Cài đặt có cùng cấu trúc: Chung, Cuộn & cử chỉ, Bàn phím, Màn hình, Công cụ, Giới thiệu.
 
 Cài đặt lưu ở `~/Library/Application Support/touchrelay/settings.txt`, log ở `~/Library/Logs/touchrelay.log`.
 
 ### Chạm hơi lệch hoặc không tap được menu bar
 
-1. Vào trang **Công cụ** trong Cài đặt, chạy **Kiểm tra vùng chạm**. Rê ngón khắp màn hình, kể cả bốn mép, rồi chạm 4 ngón để kết thúc. Nếu các mép vẫn tối là cảm biến không phủ tới đó; TouchRelay sẽ kéo vùng chạm với tới mép màn hình.
+1. Vào trang **Công cụ** trong Cài đặt, chạy **Kiểm tra vùng chạm**. Rê ngón khắp màn hình, kể cả bốn mép, rồi chạm 3 ngón để kết thúc. Nếu các mép vẫn tối là cảm biến không phủ tới đó; TouchRelay sẽ kéo vùng chạm với tới mép màn hình.
 2. Nếu vẫn lệch, chạy **Hiệu chỉnh vị trí chạm** (9 dấu).
 3. Nếu sau đó bạn đổi độ phân giải màn hình, hiệu chỉnh đã lưu tự tắt (nó chỉ áp dụng cho độ phân giải lúc hiệu chỉnh).
 
